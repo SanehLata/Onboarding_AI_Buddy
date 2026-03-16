@@ -1,0 +1,1 @@
+# Chunks docs → embeddings → ChromaDB
