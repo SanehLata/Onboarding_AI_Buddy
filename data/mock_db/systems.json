@@ -1,0 +1,155 @@
+{
+  "systems": [
+    {
+      "system_id": "jira",
+      "system_name": "Jira",
+      "category": "Project Management",
+      "description": "Issue tracking and project management tool used by all engineering teams.",
+      "access_url": "https://techcorp.atlassian.net",
+      "ticket_type": "ACCESS_REQUEST",
+      "ticket_summary_template": "Access Request - Jira for {developer_name} ({team_name})",
+      "ticket_fields": {
+        "priority": "Medium",
+        "issue_type": "Service Request",
+        "component": "IT Access Management",
+        "labels": ["new-joiner", "jira-access"]
+      },
+      "sla": {
+        "response_hours": 4,
+        "resolution_hours": 24,
+        "business_days_only": true
+      },
+      "access_levels": ["viewer", "developer", "admin"],
+      "default_access_level": "developer",
+      "requires_manager_approval": false,
+      "requires_security_review": false,
+      "onboarding_notes": "All new developers get developer-level access by default. Request admin access separately if required."
+    },
+    {
+      "system_id": "confluence",
+      "system_name": "Confluence",
+      "category": "Knowledge Management",
+      "description": "Internal wiki and documentation platform. Houses all team docs, runbooks, and architecture guides.",
+      "access_url": "https://techcorp.atlassian.net/wiki",
+      "ticket_type": "ACCESS_REQUEST",
+      "ticket_summary_template": "Access Request - Confluence for {developer_name} ({team_name})",
+      "ticket_fields": {
+        "priority": "Medium",
+        "issue_type": "Service Request",
+        "component": "IT Access Management",
+        "labels": ["new-joiner", "confluence-access"]
+      },
+      "sla": {
+        "response_hours": 4,
+        "resolution_hours": 24,
+        "business_days_only": true
+      },
+      "access_levels": ["viewer", "contributor", "space_admin"],
+      "default_access_level": "contributor",
+      "requires_manager_approval": false,
+      "requires_security_review": false,
+      "onboarding_notes": "Contributors can read and edit all pages. Space admin access requires team lead approval."
+    },
+    {
+      "system_id": "servicenow",
+      "system_name": "ServiceNow",
+      "category": "IT Service Management",
+      "description": "ITSM platform for incident management, change requests, and service catalogue.",
+      "access_url": "https://techcorp.service-now.com",
+      "ticket_type": "CHANGE_REQUEST",
+      "ticket_summary_template": "New Joiner Access - ServiceNow for {developer_name} ({team_name})",
+      "ticket_fields": {
+        "priority": "Low",
+        "issue_type": "Change Request",
+        "component": "ITSM",
+        "labels": ["new-joiner", "servicenow-access"]
+      },
+      "sla": {
+        "response_hours": 8,
+        "resolution_hours": 48,
+        "business_days_only": true
+      },
+      "access_levels": ["read_only", "requester", "fulfiller", "admin"],
+      "default_access_level": "requester",
+      "requires_manager_approval": true,
+      "requires_security_review": false,
+      "onboarding_notes": "Manager approval is required. Most engineers receive requester access to raise and track tickets."
+    },
+    {
+      "system_id": "github",
+      "system_name": "GitHub",
+      "category": "Version Control",
+      "description": "Source code repository and collaboration platform. All production code lives here.",
+      "access_url": "https://github.com/techcorp-internal",
+      "ticket_type": "ACCESS_REQUEST",
+      "ticket_summary_template": "GitHub Org Access Request for {developer_name} ({team_name})",
+      "ticket_fields": {
+        "priority": "High",
+        "issue_type": "Service Request",
+        "component": "Developer Tools",
+        "labels": ["new-joiner", "github-access", "priority"]
+      },
+      "sla": {
+        "response_hours": 2,
+        "resolution_hours": 8,
+        "business_days_only": true
+      },
+      "access_levels": ["read", "write", "maintain", "admin"],
+      "default_access_level": "write",
+      "requires_manager_approval": true,
+      "requires_security_review": false,
+      "onboarding_notes": "GitHub access is a Day 1 priority. Manager must approve. Developer is added to team-specific repos only. Request additional repo access separately."
+    },
+    {
+      "system_id": "unix",
+      "system_name": "Unix / Linux Servers",
+      "category": "Infrastructure",
+      "description": "SSH access to development, staging, and production Linux servers and bastion hosts.",
+      "access_url": "bastion.techcorp.internal",
+      "ticket_type": "SECURITY_REQUEST",
+      "ticket_summary_template": "Unix Access Request for {developer_name} ({team_name}) - {environment}",
+      "ticket_fields": {
+        "priority": "Medium",
+        "issue_type": "Security Request",
+        "component": "Infrastructure Access",
+        "labels": ["new-joiner", "unix-access", "security-review"]
+      },
+      "sla": {
+        "response_hours": 8,
+        "resolution_hours": 72,
+        "business_days_only": true
+      },
+      "access_levels": ["dev_only", "dev_staging", "full_non_prod", "prod_read", "prod_write"],
+      "default_access_level": "dev_staging",
+      "requires_manager_approval": true,
+      "requires_security_review": true,
+      "environments": ["development", "staging", "production"],
+      "onboarding_notes": "Security review is mandatory. New joiners get dev and staging access initially. Production access requires a separate request after 30 days and a security sign-off."
+    },
+    {
+      "system_id": "snowflake",
+      "system_name": "Snowflake",
+      "category": "Data Platform",
+      "description": "Cloud data warehouse used for analytics, reporting, and ML feature pipelines.",
+      "access_url": "https://techcorp.snowflakecomputing.com",
+      "ticket_type": "DATA_ACCESS_REQUEST",
+      "ticket_summary_template": "Snowflake Data Access Request for {developer_name} ({team_name})",
+      "ticket_fields": {
+        "priority": "Medium",
+        "issue_type": "Data Access Request",
+        "component": "Data Platform",
+        "labels": ["new-joiner", "snowflake-access", "data-governance"]
+      },
+      "sla": {
+        "response_hours": 8,
+        "resolution_hours": 48,
+        "business_days_only": true
+      },
+      "access_levels": ["read_raw", "read_curated", "read_write_sandbox", "read_write_prod"],
+      "default_access_level": "read_curated",
+      "requires_manager_approval": true,
+      "requires_security_review": true,
+      "onboarding_notes": "Data governance review required. New joiners receive read access to curated datasets. Write access to production schemas requires a data steward approval."
+    }
+  ]
+}

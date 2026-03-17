@@ -1,0 +1,244 @@
+{
+  "teams": [
+    {
+      "team_id": "team_payments",
+      "team_name": "Payments Engineering",
+      "department": "Engineering",
+      "manager": "Sarah Mitchell",
+      "manager_email": "sarah.mitchell@techcorp.com",
+      "description": "Responsible for payment processing, transaction management, and payment gateway integrations.",
+      "required_systems": [
+        "jira",
+        "confluence",
+        "github",
+        "servicenow",
+        "unix",
+        "snowflake"
+      ],
+      "required_skills": [
+        "Python",
+        "Java",
+        "REST APIs",
+        "PostgreSQL",
+        "Kafka",
+        "PCI-DSS compliance",
+        "Microservices",
+        "Docker"
+      ],
+      "doc_tags": [
+        "payments",
+        "transactions",
+        "gateway",
+        "pci",
+        "onboarding",
+        "architecture",
+        "runbooks"
+      ],
+      "slack_channels": [
+        "#payments-eng",
+        "#payments-alerts",
+        "#engineering-general"
+      ],
+      "tech_stack": {
+        "languages": ["Python", "Java"],
+        "frameworks": ["Spring Boot", "FastAPI"],
+        "databases": ["PostgreSQL", "Redis"],
+        "messaging": ["Kafka"],
+        "cloud": ["AWS"]
+      }
+    },
+    {
+      "team_id": "team_risk",
+      "team_name": "Risk & Compliance",
+      "department": "Engineering",
+      "manager": "James Thornton",
+      "manager_email": "james.thornton@techcorp.com",
+      "description": "Builds and maintains fraud detection, risk scoring, and regulatory compliance systems.",
+      "required_systems": [
+        "jira",
+        "confluence",
+        "github",
+        "servicenow",
+        "unix",
+        "snowflake"
+      ],
+      "required_skills": [
+        "Python",
+        "Machine Learning",
+        "SQL",
+        "Spark",
+        "Snowflake",
+        "Risk Modelling",
+        "Regulatory Reporting",
+        "Pandas"
+      ],
+      "doc_tags": [
+        "risk",
+        "fraud",
+        "compliance",
+        "ml-models",
+        "onboarding",
+        "architecture",
+        "runbooks"
+      ],
+      "slack_channels": [
+        "#risk-eng",
+        "#fraud-alerts",
+        "#ml-models",
+        "#engineering-general"
+      ],
+      "tech_stack": {
+        "languages": ["Python", "Scala"],
+        "frameworks": ["PySpark", "Scikit-learn", "XGBoost"],
+        "databases": ["Snowflake", "PostgreSQL"],
+        "messaging": ["Kafka"],
+        "cloud": ["AWS"]
+      }
+    },
+    {
+      "team_id": "team_platform",
+      "team_name": "Platform Engineering",
+      "department": "Engineering",
+      "manager": "Priya Sharma",
+      "manager_email": "priya.sharma@techcorp.com",
+      "description": "Owns the core infrastructure, CI/CD pipelines, developer tooling, and internal platform services.",
+      "required_systems": [
+        "jira",
+        "confluence",
+        "github",
+        "servicenow",
+        "unix",
+        "snowflake"
+      ],
+      "required_skills": [
+        "Kubernetes",
+        "Terraform",
+        "CI/CD",
+        "Python",
+        "Bash",
+        "AWS",
+        "Docker",
+        "Prometheus",
+        "Grafana"
+      ],
+      "doc_tags": [
+        "platform",
+        "infrastructure",
+        "cicd",
+        "kubernetes",
+        "deployment",
+        "onboarding",
+        "runbooks"
+      ],
+      "slack_channels": [
+        "#platform-eng",
+        "#infra-alerts",
+        "#deployments",
+        "#engineering-general"
+      ],
+      "tech_stack": {
+        "languages": ["Python", "Bash", "Go"],
+        "frameworks": ["FastAPI", "Helm"],
+        "databases": ["PostgreSQL", "Redis"],
+        "messaging": ["SQS", "SNS"],
+        "cloud": ["AWS"]
+      }
+    },
+    {
+      "team_id": "team_data_engineering",
+      "team_name": "Data Engineering",
+      "department": "Data",
+      "manager": "Marcus Lee",
+      "manager_email": "marcus.lee@techcorp.com",
+      "description": "Designs and maintains data pipelines, data warehousing, and analytics infrastructure.",
+      "required_systems": [
+        "jira",
+        "confluence",
+        "github",
+        "servicenow",
+        "unix",
+        "snowflake"
+      ],
+      "required_skills": [
+        "Python",
+        "SQL",
+        "Spark",
+        "Airflow",
+        "Snowflake",
+        "dbt",
+        "Kafka",
+        "Data Modelling"
+      ],
+      "doc_tags": [
+        "data",
+        "pipelines",
+        "airflow",
+        "snowflake",
+        "dbt",
+        "onboarding",
+        "architecture"
+      ],
+      "slack_channels": [
+        "#data-eng",
+        "#pipeline-alerts",
+        "#analytics",
+        "#engineering-general"
+      ],
+      "tech_stack": {
+        "languages": ["Python", "SQL"],
+        "frameworks": ["Apache Airflow", "dbt", "PySpark"],
+        "databases": ["Snowflake", "PostgreSQL"],
+        "messaging": ["Kafka"],
+        "cloud": ["AWS"]
+      }
+    },
+    {
+      "team_id": "team_auth",
+      "team_name": "Auth & Identity",
+      "department": "Engineering",
+      "manager": "Rachel Kim",
+      "manager_email": "rachel.kim@techcorp.com",
+      "description": "Owns authentication, authorisation, identity management, SSO, and access control services.",
+      "required_systems": [
+        "jira",
+        "confluence",
+        "github",
+        "servicenow",
+        "unix"
+      ],
+      "required_skills": [
+        "Python",
+        "Java",
+        "OAuth2",
+        "OpenID Connect",
+        "JWT",
+        "LDAP",
+        "Security Engineering",
+        "REST APIs"
+      ],
+      "doc_tags": [
+        "auth",
+        "identity",
+        "sso",
+        "oauth",
+        "security",
+        "onboarding",
+        "architecture",
+        "runbooks"
+      ],
+      "slack_channels": [
+        "#auth-eng",
+        "#security-alerts",
+        "#identity-platform",
+        "#engineering-general"
+      ],
+      "tech_stack": {
+        "languages": ["Python", "Java"],
+        "frameworks": ["Spring Security", "FastAPI"],
+        "databases": ["PostgreSQL", "Redis"],
+        "messaging": ["SQS"],
+        "cloud": ["AWS"]
+      }
+    }
+  ]
+}

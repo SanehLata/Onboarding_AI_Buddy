@@ -1,0 +1,338 @@
+{
+  "distribution_lists": [
+    {
+      "team_id": "team_payments",
+      "team_name": "Payments Engineering",
+      "dl_groups": [
+        {
+          "dl_id": "dl_payments_eng",
+          "dl_name": "Payments Engineering Team",
+          "email": "payments-eng@techcorp.com",
+          "type": "team",
+          "description": "Core Payments Engineering team distribution list. All team announcements and discussions.",
+          "owner_name": "Sarah Mitchell",
+          "owner_email": "sarah.mitchell@techcorp.com",
+          "member_count": 12,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Team Member - {developer_name} joining Payments Engineering",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} (email: {developer_email}) to the {dl_name} distribution list.\n\nThey are joining the Payments Engineering team on {start_date}.\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_payments_alerts",
+          "dl_name": "Payments Alerts & Incidents",
+          "email": "payments-alerts@techcorp.com",
+          "type": "alerts",
+          "description": "Receives automated alerts, incident notifications, and on-call pages for payment systems.",
+          "owner_name": "Sarah Mitchell",
+          "owner_email": "sarah.mitchell@techcorp.com",
+          "member_count": 8,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "DL Subscription Request - {developer_name} for Payments Alerts",
+            "body": "Hi {owner_name},\n\nPlease subscribe {developer_name} ({developer_email}) to the Payments Alerts distribution list.\n\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_engineering_general",
+          "dl_name": "Engineering All Hands",
+          "email": "engineering@techcorp.com",
+          "type": "org_wide",
+          "description": "Company-wide engineering distribution list for all-hands updates and org announcements.",
+          "owner_name": "CTO Office",
+          "owner_email": "cto-office@techcorp.com",
+          "member_count": 150,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Engineer Subscription - {developer_name}",
+            "body": "Hi,\n\nPlease add {developer_name} ({developer_email}) to the Engineering All Hands distribution list.\n\nTeam: Payments Engineering\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        }
+      ]
+    },
+    {
+      "team_id": "team_risk",
+      "team_name": "Risk & Compliance",
+      "dl_groups": [
+        {
+          "dl_id": "dl_risk_eng",
+          "dl_name": "Risk Engineering Team",
+          "email": "risk-eng@techcorp.com",
+          "type": "team",
+          "description": "Core Risk & Compliance Engineering distribution list for team communications.",
+          "owner_name": "James Thornton",
+          "owner_email": "james.thornton@techcorp.com",
+          "member_count": 10,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Team Member - {developer_name} joining Risk Engineering",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} (email: {developer_email}) to the {dl_name} distribution list.\n\nThey are joining the Risk & Compliance team on {start_date}.\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_fraud_alerts",
+          "dl_name": "Fraud Detection Alerts",
+          "email": "fraud-alerts@techcorp.com",
+          "type": "alerts",
+          "description": "Fraud model alerts, threshold breach notifications, and risk escalations.",
+          "owner_name": "James Thornton",
+          "owner_email": "james.thornton@techcorp.com",
+          "member_count": 7,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "DL Subscription Request - {developer_name} for Fraud Alerts",
+            "body": "Hi {owner_name},\n\nPlease subscribe {developer_name} ({developer_email}) to the Fraud Detection Alerts distribution list.\n\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_ml_models",
+          "dl_name": "ML Models & Data Science",
+          "email": "ml-models@techcorp.com",
+          "type": "community",
+          "description": "Cross-team ML practitioners group. Model releases, experiment discussions, and data science updates.",
+          "owner_name": "James Thornton",
+          "owner_email": "james.thornton@techcorp.com",
+          "member_count": 25,
+          "subscription_required": true,
+          "auto_subscribe_on_join": false,
+          "email_template": {
+            "subject": "ML Community DL Request - {developer_name}",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} ({developer_email}) to the ML Models community distribution list.\n\nTeam: Risk Engineering\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_engineering_general",
+          "dl_name": "Engineering All Hands",
+          "email": "engineering@techcorp.com",
+          "type": "org_wide",
+          "description": "Company-wide engineering distribution list.",
+          "owner_name": "CTO Office",
+          "owner_email": "cto-office@techcorp.com",
+          "member_count": 150,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Engineer Subscription - {developer_name}",
+            "body": "Hi,\n\nPlease add {developer_name} ({developer_email}) to the Engineering All Hands distribution list.\n\nTeam: Risk Engineering\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        }
+      ]
+    },
+    {
+      "team_id": "team_platform",
+      "team_name": "Platform Engineering",
+      "dl_groups": [
+        {
+          "dl_id": "dl_platform_eng",
+          "dl_name": "Platform Engineering Team",
+          "email": "platform-eng@techcorp.com",
+          "type": "team",
+          "description": "Core Platform Engineering team distribution list.",
+          "owner_name": "Priya Sharma",
+          "owner_email": "priya.sharma@techcorp.com",
+          "member_count": 14,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Team Member - {developer_name} joining Platform Engineering",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} (email: {developer_email}) to the {dl_name} distribution list.\n\nThey are joining the Platform Engineering team on {start_date}.\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_infra_alerts",
+          "dl_name": "Infrastructure Alerts",
+          "email": "infra-alerts@techcorp.com",
+          "type": "alerts",
+          "description": "Infrastructure health alerts, Kubernetes cluster notifications, and deployment pipeline statuses.",
+          "owner_name": "Priya Sharma",
+          "owner_email": "priya.sharma@techcorp.com",
+          "member_count": 10,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "DL Subscription Request - {developer_name} for Infra Alerts",
+            "body": "Hi {owner_name},\n\nPlease subscribe {developer_name} ({developer_email}) to the Infrastructure Alerts distribution list.\n\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_deployments",
+          "dl_name": "Deployments & Releases",
+          "email": "deployments@techcorp.com",
+          "type": "operational",
+          "description": "Deployment notifications, release announcements, and rollback alerts across all services.",
+          "owner_name": "Priya Sharma",
+          "owner_email": "priya.sharma@techcorp.com",
+          "member_count": 40,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "Deployments DL Request - {developer_name}",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} ({developer_email}) to the Deployments & Releases distribution list.\n\nTeam: Platform Engineering\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_engineering_general",
+          "dl_name": "Engineering All Hands",
+          "email": "engineering@techcorp.com",
+          "type": "org_wide",
+          "description": "Company-wide engineering distribution list.",
+          "owner_name": "CTO Office",
+          "owner_email": "cto-office@techcorp.com",
+          "member_count": 150,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Engineer Subscription - {developer_name}",
+            "body": "Hi,\n\nPlease add {developer_name} ({developer_email}) to the Engineering All Hands distribution list.\n\nTeam: Platform Engineering\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        }
+      ]
+    },
+    {
+      "team_id": "team_data_engineering",
+      "team_name": "Data Engineering",
+      "dl_groups": [
+        {
+          "dl_id": "dl_data_eng",
+          "dl_name": "Data Engineering Team",
+          "email": "data-eng@techcorp.com",
+          "type": "team",
+          "description": "Core Data Engineering team distribution list for team communications.",
+          "owner_name": "Marcus Lee",
+          "owner_email": "marcus.lee@techcorp.com",
+          "member_count": 9,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Team Member - {developer_name} joining Data Engineering",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} (email: {developer_email}) to the {dl_name} distribution list.\n\nThey are joining the Data Engineering team on {start_date}.\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_pipeline_alerts",
+          "dl_name": "Pipeline Alerts",
+          "email": "pipeline-alerts@techcorp.com",
+          "type": "alerts",
+          "description": "Airflow DAG failures, pipeline SLA breaches, and data quality alerts.",
+          "owner_name": "Marcus Lee",
+          "owner_email": "marcus.lee@techcorp.com",
+          "member_count": 9,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "DL Subscription Request - {developer_name} for Pipeline Alerts",
+            "body": "Hi {owner_name},\n\nPlease subscribe {developer_name} ({developer_email}) to the Pipeline Alerts distribution list.\n\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_analytics",
+          "dl_name": "Analytics Community",
+          "email": "analytics@techcorp.com",
+          "type": "community",
+          "description": "Cross-functional analytics community. Data analysts, engineers, and business stakeholders.",
+          "owner_name": "Marcus Lee",
+          "owner_email": "marcus.lee@techcorp.com",
+          "member_count": 35,
+          "subscription_required": true,
+          "auto_subscribe_on_join": false,
+          "email_template": {
+            "subject": "Analytics Community DL Request - {developer_name}",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} ({developer_email}) to the Analytics Community distribution list.\n\nTeam: Data Engineering\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_engineering_general",
+          "dl_name": "Engineering All Hands",
+          "email": "engineering@techcorp.com",
+          "type": "org_wide",
+          "description": "Company-wide engineering distribution list.",
+          "owner_name": "CTO Office",
+          "owner_email": "cto-office@techcorp.com",
+          "member_count": 150,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Engineer Subscription - {developer_name}",
+            "body": "Hi,\n\nPlease add {developer_name} ({developer_email}) to the Engineering All Hands distribution list.\n\nTeam: Data Engineering\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        }
+      ]
+    },
+    {
+      "team_id": "team_auth",
+      "team_name": "Auth & Identity",
+      "dl_groups": [
+        {
+          "dl_id": "dl_auth_eng",
+          "dl_name": "Auth & Identity Team",
+          "email": "auth-eng@techcorp.com",
+          "type": "team",
+          "description": "Core Auth & Identity Engineering team distribution list.",
+          "owner_name": "Rachel Kim",
+          "owner_email": "rachel.kim@techcorp.com",
+          "member_count": 8,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Team Member - {developer_name} joining Auth & Identity",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} (email: {developer_email}) to the {dl_name} distribution list.\n\nThey are joining the Auth & Identity team on {start_date}.\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_security_alerts",
+          "dl_name": "Security Alerts",
+          "email": "security-alerts@techcorp.com",
+          "type": "alerts",
+          "description": "Security incident alerts, vulnerability notifications, and access anomaly reports.",
+          "owner_name": "Rachel Kim",
+          "owner_email": "rachel.kim@techcorp.com",
+          "member_count": 12,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "DL Subscription Request - {developer_name} for Security Alerts",
+            "body": "Hi {owner_name},\n\nPlease subscribe {developer_name} ({developer_email}) to the Security Alerts distribution list.\n\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_identity_platform",
+          "dl_name": "Identity Platform Updates",
+          "email": "identity-platform@techcorp.com",
+          "type": "operational",
+          "description": "SSO changes, identity provider updates, and auth service release notes.",
+          "owner_name": "Rachel Kim",
+          "owner_email": "rachel.kim@techcorp.com",
+          "member_count": 20,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "Identity Platform DL Request - {developer_name}",
+            "body": "Hi {owner_name},\n\nPlease add {developer_name} ({developer_email}) to the Identity Platform Updates distribution list.\n\nTeam: Auth & Identity\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        },
+        {
+          "dl_id": "dl_engineering_general",
+          "dl_name": "Engineering All Hands",
+          "email": "engineering@techcorp.com",
+          "type": "org_wide",
+          "description": "Company-wide engineering distribution list.",
+          "owner_name": "CTO Office",
+          "owner_email": "cto-office@techcorp.com",
+          "member_count": 150,
+          "subscription_required": true,
+          "auto_subscribe_on_join": true,
+          "email_template": {
+            "subject": "New Engineer Subscription - {developer_name}",
+            "body": "Hi,\n\nPlease add {developer_name} ({developer_email}) to the Engineering All Hands distribution list.\n\nTeam: Auth & Identity\nStart date: {start_date}\n\nThanks,\nOnboarding Buddy"
+          }
+        }
+      ]
+    }
+  ]
+}
