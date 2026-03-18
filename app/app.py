@@ -27,6 +27,7 @@ from memory.progress import (
     get_learning_path,
     get_covered_topics,
     get_next_unread_doc,
+    record_doc_read,
 )
 from memory.profile_store import (
     get_access_requests,
@@ -221,6 +222,24 @@ html, body, [class*="css"] {
     background: #161b22;
     border: 1px solid #21262d;
     border-radius: 8px;
+}
+
+/* ── Mark as read button ── */
+.stButton > button[kind="secondary"] {
+    background: transparent;
+    border: 1px solid #238636;
+    color: #3fb950;
+    font-size: 0.72rem;
+    font-family: 'DM Mono', monospace;
+    padding: 2px 10px;
+    border-radius: 20px;
+    height: auto;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+.stButton > button[kind="secondary"]:hover {
+    background: rgba(35,134,54,0.15);
+    border-color: #3fb950;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -526,7 +545,8 @@ def render_access_tab() -> None:
 
 def render_learning_tab() -> None:
     """Learning path panel."""
-    dev_id = _dev_id()
+    dev_id     = _dev_id()
+    session_id = st.session_state.graph_state.get("session_id")
 
     if not dev_id or not _path_generated():
         st.markdown("""
@@ -540,10 +560,9 @@ def render_learning_tab() -> None:
         return
 
     path    = get_learning_path(dev_id)
-    covered = set(get_covered_topics(dev_id))
     summary = get_progress_summary(dev_id)
 
-    # Progress bar
+    # Progress metrics
     st.markdown('<div class="section-label">Overall Progress</div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -599,16 +618,35 @@ def render_learning_tab() -> None:
             for doc in cat_docs:
                 status_icon = status_icons.get(doc["status"], "⬜")
                 badge_html  = _badge(doc["status"])
-                st.markdown(f"""
-                <div class="doc-card">
-                    <span style="font-size:1rem;">{status_icon}</span>
-                    <div style="flex:1;">
-                        <div class="doc-title">{doc['doc_title']}</div>
-                        <div class="doc-reason">{doc.get('reason', '')}</div>
+
+                # Render doc card + mark-as-read button in the same row
+                col_card, col_btn = st.columns([10, 2])
+
+                with col_card:
+                    st.markdown(f"""
+                    <div class="doc-card">
+                        <span style="font-size:1rem;">{status_icon}</span>
+                        <div style="flex:1;">
+                            <div class="doc-title">{doc['doc_title']}</div>
+                            <div class="doc-reason">{doc.get('reason', '')}</div>
+                        </div>
+                        {badge_html}
                     </div>
-                    {badge_html}
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+
+                with col_btn:
+                    # Only show the button for not_started and in_progress docs
+                    if doc["status"] in ("not_started", "in_progress") and session_id:
+                        btn_key = f"read_{doc['doc_path'].replace('/', '_')}"
+                        if st.button("✅ Mark read", key=btn_key, type="secondary"):
+                            record_doc_read(
+                                developer_id=dev_id,
+                                session_id=session_id,
+                                doc_path=doc["doc_path"],
+                                doc_title=doc["doc_title"],
+                            )
+                            st.toast(f"'{doc['doc_title']}' marked as read!", icon="✅")
+                            st.rerun()
 
 
 def render_insights_tab() -> None:

@@ -281,6 +281,52 @@ def mark_doc_completed(developer_id: int, doc_path: str) -> None:
         )
 
 
+def record_doc_read(
+    developer_id: int,
+    session_id: int,
+    doc_path: str,
+    doc_title: str,
+) -> None:
+    """
+    Record that a developer marked a document as read via the UI button.
+
+    Does all three things required for nudge logic to work correctly:
+      1. Updates learning_path status → 'completed'  (not_started decreases)
+      2. Inserts into progress_tracking              (total_questions increases)
+      3. Increments sessions.message_count           (should_nudge fires correctly)
+
+    Uses a [READ] prefix on the query field to distinguish document reads
+    from questions asked — useful for analytics and LLM history filtering.
+    """
+    # 1. Mark the document as completed in learning_path
+    mark_doc_completed(developer_id, doc_path)
+
+    # 2. Insert into progress_tracking so total_questions count increments
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO progress_tracking
+                (developer_id, topic, source_doc, query,
+                 summary, session_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                developer_id,
+                doc_title,                              # topic = document title
+                doc_path,                               # source_doc = doc path
+                f"[READ] {doc_title}",                  # [READ] prefix distinguishes from questions
+                f"Developer marked '{doc_title}' as read.",
+                session_id,
+                _now(),
+            ),
+        )
+
+    # 3. Keep session topics in sync and increment message counter
+    #    so should_nudge (total_questions % PROACTIVE_NUDGE_AFTER == 0) fires correctly
+    add_topic_to_session(session_id, doc_title)
+    increment_session_messages(session_id)
+
+
 def get_next_unread_doc(developer_id: int) -> Optional[dict]:
     """
     Return the next not_started document in the learning path.
