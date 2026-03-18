@@ -1,0 +1,8 @@
+## Overview
+
+The Auth Service is TechCorp's centralised authentication and authorisation platform. It handles all user login flows, token issuance, session management, and permission enforcement across every internal and external-facing application.
+
+**Team:** Auth & Identity
+**Manager:** Rachel Kim (rachel.kim@techcorp.com)
+**Slack:** `#auth-eng`
+**On-call:** PagerDuty — Auth & Identity rotatio
