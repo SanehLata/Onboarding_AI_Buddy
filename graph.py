@@ -20,7 +20,6 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import TypedDict, Annotated, Sequence
 from datetime import date
 
@@ -58,12 +57,12 @@ class OnboardingState(TypedDict):
     messages:             Annotated[Sequence[BaseMessage], operator.add]
     user_message:         str
     response:             str
-    session_id:           str
+    session_id:           Optional[int]
 
     # Profile
     profile:              dict          # developer profile dict
     profile_complete:     bool          # name + email + team collected
-    developer_id:         str           # persisted DB id
+    developer_id:         Optional[int] # persisted DB integer id
 
     # Workflow flags
     provisioning_complete: bool
@@ -114,6 +113,8 @@ def profile_node(state: OnboardingState) -> OnboardingState:
     # If profile is now complete, look up manager details from teams data
     profile_complete = profile_complete_signal or extracted.get("profile_complete", False)
 
+    session_id = None  # will be set inside the if block if profile just completed
+
     if profile_complete and not updated_profile.get("id"):
         # Resolve team_id from team_name
         if updated_profile.get("team_name") and not updated_profile.get("team_id"):
@@ -132,13 +133,16 @@ def profile_node(state: OnboardingState) -> OnboardingState:
         updated_profile.setdefault("manager_email", "")
 
         # Persist to DB
-        dev_id = save_profile(updated_profile)
+        dev_id     = save_profile(updated_profile)        # returns int PK
         updated_profile["id"] = dev_id
+
+        # Start a DB session now that we have a real developer_id
+        session_id = start_session(dev_id)                  # returns int PK
 
         log_agent_action(
             dev_id, "PROFILE_COMPLETE",
             {"team": updated_profile.get("team_name"), "level": updated_profile.get("experience_level")},
-            session_id=state.get("session_id", ""),
+            session_id=session_id,
         )
 
     new_messages = [
@@ -146,13 +150,21 @@ def profile_node(state: OnboardingState) -> OnboardingState:
         AIMessage(content=response),
     ]
 
+    # Use newly created session_id if profile just completed, else keep existing
+    resolved_session_id = (
+        session_id
+        if profile_complete and not state.get("session_id")
+        else state.get("session_id")
+    )
+
     return {
         **state,
         "messages":          new_messages,
         "response":          response,
         "profile":           updated_profile,
         "profile_complete":  profile_complete,
-        "developer_id":      updated_profile.get("id", ""),
+        "developer_id":      updated_profile.get("id"),  # int after save_profile()
+        "session_id":        resolved_session_id,
     }
 
 
@@ -207,7 +219,7 @@ def answer_question_node(state: OnboardingState) -> OnboardingState:
     Answer a developer question using RAG over the knowledge base.
     """
     profile    = state["profile"]
-    session_id = state.get("session_id", "")
+    session_id = state.get("session_id")   # int or None
 
     result = answer_question(
         query=state["user_message"],
@@ -358,7 +370,7 @@ def build_graph() -> StateGraph:
 onboarding_graph = build_graph()
 
 
-def create_initial_state(session_id: str = None) -> OnboardingState:
+def create_initial_state(session_id: Optional[int] = None) -> OnboardingState:
     """
     Return a fresh state dict for a new user session.
     Call this once when a new chat session starts.
@@ -367,10 +379,10 @@ def create_initial_state(session_id: str = None) -> OnboardingState:
         messages=[],
         user_message="",
         response="",
-        session_id=session_id or str(uuid.uuid4()),
+        session_id=session_id,          # set to int after profile is complete
         profile={},
         profile_complete=False,
-        developer_id="",
+        developer_id=None,
         provisioning_complete=False,
         provisioning_results={},
         path_generated=False,

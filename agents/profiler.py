@@ -192,7 +192,7 @@ def run_provisioning(state: dict) -> dict:
     """
     profile    = state["profile"]
     dev_id     = profile["id"]
-    session_id = state.get("session_id", "")
+    session_id = state.get("session_id")   # int or None — assigned after profile saved
 
     provisioning_results = {}
 

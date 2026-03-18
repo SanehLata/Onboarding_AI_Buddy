@@ -6,7 +6,6 @@
 
 import sqlite3
 import json
-import uuid
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
@@ -41,7 +40,7 @@ SCHEMA = """
 
 -- Developer profiles — one row per onboarded developer
 CREATE TABLE IF NOT EXISTS developer_profiles (
-    id                TEXT PRIMARY KEY,
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
     name              TEXT NOT NULL,
     email             TEXT NOT NULL UNIQUE,
     team_id           TEXT NOT NULL,
@@ -61,8 +60,8 @@ CREATE TABLE IF NOT EXISTS developer_profiles (
 
 -- Access / ticket requests — one row per system per developer
 CREATE TABLE IF NOT EXISTS access_requests (
-    id                TEXT PRIMARY KEY,
-    developer_id      TEXT NOT NULL REFERENCES developer_profiles(id),
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    developer_id      INTEGER NOT NULL REFERENCES developer_profiles(id),
     system_id         TEXT NOT NULL,
     system_name       TEXT NOT NULL,
     ticket_type       TEXT NOT NULL,
@@ -83,8 +82,8 @@ CREATE TABLE IF NOT EXISTS access_requests (
 
 -- Distribution list subscriptions — one row per DL per developer
 CREATE TABLE IF NOT EXISTS dl_subscriptions (
-    id              TEXT PRIMARY KEY,
-    developer_id    TEXT NOT NULL REFERENCES developer_profiles(id),
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    developer_id    INTEGER NOT NULL REFERENCES developer_profiles(id),
     dl_id           TEXT NOT NULL,
     dl_name         TEXT NOT NULL,
     dl_email        TEXT NOT NULL,
@@ -100,8 +99,8 @@ CREATE TABLE IF NOT EXISTS dl_subscriptions (
 
 -- Learning path — one row per recommended document per developer
 CREATE TABLE IF NOT EXISTS learning_path (
-    id               TEXT PRIMARY KEY,
-    developer_id     TEXT NOT NULL REFERENCES developer_profiles(id),
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    developer_id     INTEGER NOT NULL REFERENCES developer_profiles(id),
     doc_path         TEXT NOT NULL,      -- relative path e.g. onboarding/day1_checklist.md
     doc_title        TEXT NOT NULL,
     category         TEXT NOT NULL,      -- onboarding | architecture | runbooks
@@ -117,20 +116,20 @@ CREATE TABLE IF NOT EXISTS learning_path (
 
 -- Progress tracking — conversation history and topic coverage
 CREATE TABLE IF NOT EXISTS progress_tracking (
-    id              TEXT PRIMARY KEY,
-    developer_id    TEXT NOT NULL REFERENCES developer_profiles(id),
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    developer_id    INTEGER NOT NULL REFERENCES developer_profiles(id),
     topic           TEXT NOT NULL,       -- topic or document name covered
     source_doc      TEXT,                -- doc that answered the query
     query           TEXT,                -- what the developer asked
     summary         TEXT,                -- brief summary of what was covered
-    session_id      TEXT NOT NULL,       -- groups messages in same session
+    session_id      INTEGER NOT NULL REFERENCES sessions(id),
     created_at      TEXT NOT NULL
 );
 
 -- Sessions — tracks each conversation session
 CREATE TABLE IF NOT EXISTS sessions (
-    id           TEXT PRIMARY KEY,
-    developer_id TEXT NOT NULL REFERENCES developer_profiles(id),
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    developer_id INTEGER NOT NULL REFERENCES developer_profiles(id),
     started_at   TEXT NOT NULL,
     ended_at     TEXT,
     message_count INTEGER NOT NULL DEFAULT 0,
@@ -139,9 +138,9 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 -- Agent actions log — audit trail of everything the agent did
 CREATE TABLE IF NOT EXISTS agent_action_log (
-    id           TEXT PRIMARY KEY,
-    developer_id TEXT NOT NULL REFERENCES developer_profiles(id),
-    session_id   TEXT,
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    developer_id INTEGER NOT NULL REFERENCES developer_profiles(id),
+    session_id   INTEGER REFERENCES sessions(id),
     action_type  TEXT NOT NULL,    -- TICKET_RAISED | EMAIL_SENT | PATH_GENERATED | QUERY_ANSWERED
     action_data  TEXT NOT NULL,    -- JSON blob of action details
     status       TEXT NOT NULL,    -- success | failed | skipped
@@ -157,7 +156,6 @@ def seed_developers(conn: sqlite3.Connection) -> list[dict]:
 
     developers = [
         {
-            "id":               str(uuid.uuid4()),
             "name":             "Alex Chen",
             "email":            "alex.chen@techcorp.com",
             "team_id":          "team_payments",
@@ -174,7 +172,6 @@ def seed_developers(conn: sqlite3.Connection) -> list[dict]:
             "updated_at":       now(),
         },
         {
-            "id":               str(uuid.uuid4()),
             "name":             "Priya Patel",
             "email":            "priya.patel@techcorp.com",
             "team_id":          "team_data_engineering",
@@ -191,7 +188,6 @@ def seed_developers(conn: sqlite3.Connection) -> list[dict]:
             "updated_at":       now(),
         },
         {
-            "id":               str(uuid.uuid4()),
             "name":             "Jordan Williams",
             "email":            "jordan.williams@techcorp.com",
             "team_id":          "team_platform",
@@ -212,18 +208,26 @@ def seed_developers(conn: sqlite3.Connection) -> list[dict]:
     conn.executemany(
         """
         INSERT OR IGNORE INTO developer_profiles
-            (id, name, email, team_id, team_name, manager_name, manager_email,
+            (name, email, team_id, team_name, manager_name, manager_email,
              role_title, experience_level, skills, start_date, onboarding_status,
              profile_complete, created_at, updated_at)
         VALUES
-            (:id, :name, :email, :team_id, :team_name, :manager_name, :manager_email,
+            (:name, :email, :team_id, :team_name, :manager_name, :manager_email,
              :role_title, :experience_level, :skills, :start_date, :onboarding_status,
              :profile_complete, :created_at, :updated_at)
         """,
         developers,
     )
 
-    print(f"  ✅  Inserted {len(developers)} developer profiles")
+    # Fetch back the auto-assigned integer IDs and attach to each developer dict
+    rows = conn.execute(
+        "SELECT id, email FROM developer_profiles ORDER BY id"
+    ).fetchall()
+    email_to_id = {row[1]: row[0] for row in rows}
+    for dev in developers:
+        dev["id"] = email_to_id[dev["email"]]
+
+    print(f"  ✅  Inserted {len(developers)} developer profiles (IDs: {[d['id'] for d in developers]})")
     return developers
 
 
@@ -266,7 +270,6 @@ def seed_access_requests(conn: sqlite3.Connection, developers: list[dict]) -> No
             status = status_cycle[(i + j) % len(status_cycle)]
             ticket_id = f"TICK-{1000 + i * 10 + j}" if status != "pending" else None
             records.append({
-                "id":               str(uuid.uuid4()),
                 "developer_id":     dev["id"],
                 "system_id":        sys_id,
                 "system_name":      sys_name,
@@ -288,11 +291,11 @@ def seed_access_requests(conn: sqlite3.Connection, developers: list[dict]) -> No
     conn.executemany(
         """
         INSERT OR IGNORE INTO access_requests
-            (id, developer_id, system_id, system_name, ticket_type, ticket_id,
+            (developer_id, system_id, system_name, ticket_type, ticket_id,
              ticket_summary, status, access_level, requires_approval, approved_by,
              sla_hours, raised_at, resolved_at, notes, created_at, updated_at)
         VALUES
-            (:id, :developer_id, :system_id, :system_name, :ticket_type, :ticket_id,
+            (:developer_id, :system_id, :system_name, :ticket_type, :ticket_id,
              :ticket_summary, :status, :access_level, :requires_approval, :approved_by,
              :sla_hours, :raised_at, :resolved_at, :notes, :created_at, :updated_at)
         """,
@@ -344,7 +347,6 @@ def seed_learning_paths(conn: sqlite3.Connection, developers: list[dict]) -> Non
         for j, (doc_path, doc_title, category, order) in enumerate(all_docs):
             status = status_cycle[min(j, len(status_cycle) - 1)]
             records.append({
-                "id":            str(uuid.uuid4()),
                 "developer_id":  dev["id"],
                 "doc_path":      doc_path,
                 "doc_title":     doc_title,
@@ -361,10 +363,10 @@ def seed_learning_paths(conn: sqlite3.Connection, developers: list[dict]) -> Non
     conn.executemany(
         """
         INSERT OR IGNORE INTO learning_path
-            (id, developer_id, doc_path, doc_title, category, priority_order,
+            (developer_id, doc_path, doc_title, category, priority_order,
              reason, status, started_at, completed_at, created_at, updated_at)
         VALUES
-            (:id, :developer_id, :doc_path, :doc_title, :category, :priority_order,
+            (:developer_id, :doc_path, :doc_title, :category, :priority_order,
              :reason, :status, :started_at, :completed_at, :created_at, :updated_at)
         """,
         records,
@@ -376,17 +378,15 @@ def seed_progress(conn: sqlite3.Connection, developers: list[dict]) -> None:
     """Insert sample progress tracking entries and sessions for the first developer."""
 
     dev = developers[0]   # Seed progress only for Alex Chen
-    session_id = str(uuid.uuid4())
 
-    # Seed one session
+    # Seed one session — id is auto-assigned by SQLite
     conn.execute(
         """
         INSERT OR IGNORE INTO sessions
-            (id, developer_id, started_at, ended_at, message_count, topics_covered)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (developer_id, started_at, ended_at, message_count, topics_covered)
+        VALUES (?, ?, ?, ?, ?)
         """,
         (
-            session_id,
             dev["id"],
             now(),
             now(),
@@ -394,6 +394,11 @@ def seed_progress(conn: sqlite3.Connection, developers: list[dict]) -> None:
             json.dumps(["day1 checklist", "vpn setup", "github access", "team norms"]),
         ),
     )
+    # Fetch back the auto-assigned session id
+    session_id = conn.execute(
+        "SELECT id FROM sessions WHERE developer_id = ? ORDER BY id DESC LIMIT 1",
+        (dev["id"],)
+    ).fetchone()[0]
 
     # Seed sample progress entries
     progress_entries = [
@@ -405,7 +410,6 @@ def seed_progress(conn: sqlite3.Connection, developers: list[dict]) -> None:
 
     records = [
         {
-            "id":           str(uuid.uuid4()),
             "developer_id": dev["id"],
             "topic":        topic,
             "source_doc":   source,
@@ -420,20 +424,25 @@ def seed_progress(conn: sqlite3.Connection, developers: list[dict]) -> None:
     conn.executemany(
         """
         INSERT OR IGNORE INTO progress_tracking
-            (id, developer_id, topic, source_doc, query, summary, session_id, created_at)
+            (developer_id, topic, source_doc, query, summary, session_id, created_at)
         VALUES
-            (:id, :developer_id, :topic, :source_doc, :query, :summary, :session_id, :created_at)
+            (:developer_id, :topic, :source_doc, :query, :summary, :session_id, :created_at)
         """,
         records,
     )
-    print(f"  ✅  Inserted {len(records)} progress tracking entries + 1 session for {dev['name']}")
+    print(f"  ✅  Inserted {len(records)} progress tracking entries + 1 session (id={session_id}) for {dev['name']}")
 
 
 def seed_agent_log(conn: sqlite3.Connection, developers: list[dict]) -> None:
     """Insert sample agent action log entries."""
 
     dev = developers[0]
-    session_id = str(uuid.uuid4())
+    # Re-use the session created in seed_progress for this developer
+    row = conn.execute(
+        "SELECT id FROM sessions WHERE developer_id = ? ORDER BY id LIMIT 1",
+        (dev["id"],)
+    ).fetchone()
+    session_id = row[0] if row else None
 
     log_entries = [
         ("TICKET_RAISED",    {"system": "Jira",       "ticket_id": "TICK-1000", "status": "raised"},          "success"),
@@ -445,7 +454,6 @@ def seed_agent_log(conn: sqlite3.Connection, developers: list[dict]) -> None:
 
     records = [
         {
-            "id":           str(uuid.uuid4()),
             "developer_id": dev["id"],
             "session_id":   session_id,
             "action_type":  action_type,
@@ -460,9 +468,9 @@ def seed_agent_log(conn: sqlite3.Connection, developers: list[dict]) -> None:
     conn.executemany(
         """
         INSERT OR IGNORE INTO agent_action_log
-            (id, developer_id, session_id, action_type, action_data, status, error, created_at)
+            (developer_id, session_id, action_type, action_data, status, error, created_at)
         VALUES
-            (:id, :developer_id, :session_id, :action_type, :action_data, :status, :error, :created_at)
+            (:developer_id, :session_id, :action_type, :action_data, :status, :error, :created_at)
         """,
         records,
     )

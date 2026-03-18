@@ -4,7 +4,6 @@
 # Run: streamlit run app/main.py
 
 import sys
-import uuid
 from pathlib import Path
 
 # ── Path setup — allows imports from project root ─────────────────────────────
@@ -231,7 +230,7 @@ html, body, [class*="css"] {
 
 def _init_session() -> None:
     if "graph_state" not in st.session_state:
-        st.session_state.graph_state = create_initial_state(session_id=str(uuid.uuid4()))
+        st.session_state.graph_state = create_initial_state()
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "greeted" not in st.session_state:
@@ -255,8 +254,8 @@ def _path_generated() -> bool:
     return st.session_state.graph_state.get("path_generated", False)
 
 
-def _dev_id() -> str | None:
-    return _profile().get("id")
+def _dev_id() -> int | None:
+    return _profile().get("id")   # int PK from DB
 
 
 def _badge(status: str) -> str:
@@ -386,7 +385,7 @@ def render_sidebar() -> None:
 
         # ── Reset button ──────────────────────────────────────────────────────
         if st.button("🔄 Start New Session", use_container_width=True):
-            st.session_state.graph_state = create_initial_state(session_id=str(uuid.uuid4()))
+            st.session_state.graph_state = create_initial_state()
             st.session_state.chat_history = []
             st.session_state.greeted = False
             st.rerun()

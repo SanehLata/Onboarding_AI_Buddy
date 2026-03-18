@@ -3,10 +3,12 @@
 # Tracks what a developer has covered across sessions.
 # Powers the "don't repeat yourself" and proactive nudge behaviour
 # of the Learning Path agent.
+#
+# Primary keys are INTEGER AUTOINCREMENT throughout.
+# session_id is an int FK to sessions.id — not a UUID string.
 
 import sqlite3
 import json
-import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -29,21 +31,24 @@ def _connect() -> sqlite3.Connection:
 
 # ── Session Management ────────────────────────────────────────────────────────
 
-def start_session(developer_id: str) -> str:
-    """Create a new session and return its ID."""
-    session_id = str(uuid.uuid4())
+def start_session(developer_id: int) -> int:
+    """
+    Create a new session row and return the auto-assigned integer session ID.
+    Called once at the start of each Streamlit conversation.
+    """
     with _connect() as conn:
-        conn.execute(
+        cursor = conn.execute(
             """
-            INSERT INTO sessions (id, developer_id, started_at, message_count, topics_covered)
-            VALUES (?, ?, ?, 0, '[]')
+            INSERT INTO sessions
+                (developer_id, started_at, message_count, topics_covered)
+            VALUES (?, ?, 0, '[]')
             """,
-            (session_id, developer_id, _now()),
+            (developer_id, _now()),
         )
-    return session_id
+        return cursor.lastrowid
 
 
-def end_session(session_id: str) -> None:
+def end_session(session_id: int) -> None:
     """Mark a session as ended."""
     with _connect() as conn:
         conn.execute(
@@ -52,7 +57,7 @@ def end_session(session_id: str) -> None:
         )
 
 
-def increment_session_messages(session_id: str) -> None:
+def increment_session_messages(session_id: int) -> None:
     """Increment the message counter for a session."""
     with _connect() as conn:
         conn.execute(
@@ -61,7 +66,7 @@ def increment_session_messages(session_id: str) -> None:
         )
 
 
-def add_topic_to_session(session_id: str, topic: str) -> None:
+def add_topic_to_session(session_id: int, topic: str) -> None:
     """Add a topic string to the session's topics_covered JSON array."""
     with _connect() as conn:
         row = conn.execute(
@@ -81,7 +86,7 @@ def add_topic_to_session(session_id: str, topic: str) -> None:
             )
 
 
-def get_session(session_id: str) -> Optional[dict]:
+def get_session(session_id: int) -> Optional[dict]:
     """Return session details including topics covered."""
     with _connect() as conn:
         row = conn.execute(
@@ -100,8 +105,8 @@ def get_session(session_id: str) -> Optional[dict]:
 # ── Progress Tracking ─────────────────────────────────────────────────────────
 
 def record_progress(
-    developer_id: str,
-    session_id: str,
+    developer_id: int,
+    session_id: int,
     topic: str,
     query: str,
     summary: str,
@@ -110,16 +115,16 @@ def record_progress(
     """
     Record that a developer covered a topic during a session.
     Called after every successfully answered question.
+    id is auto-assigned; session_id is an integer FK to sessions.id.
     """
     with _connect() as conn:
         conn.execute(
             """
             INSERT INTO progress_tracking
-                (id, developer_id, topic, source_doc, query, summary, session_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (developer_id, topic, source_doc, query, summary, session_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                str(uuid.uuid4()),
                 developer_id,
                 topic,
                 source_doc,
@@ -130,12 +135,12 @@ def record_progress(
             ),
         )
 
-    # Also update the session topics list
+    # Keep session topics list in sync
     add_topic_to_session(session_id, topic)
     increment_session_messages(session_id)
 
 
-def get_covered_topics(developer_id: str) -> list[str]:
+def get_covered_topics(developer_id: int) -> list[str]:
     """
     Return all unique topics this developer has covered across all sessions.
     Used to avoid repeating already-answered content.
@@ -148,7 +153,7 @@ def get_covered_topics(developer_id: str) -> list[str]:
     return [r["topic"] for r in rows]
 
 
-def get_covered_docs(developer_id: str) -> list[str]:
+def get_covered_docs(developer_id: int) -> list[str]:
     """Return all source documents this developer has been referred to."""
     with _connect() as conn:
         rows = conn.execute(
@@ -161,10 +166,11 @@ def get_covered_docs(developer_id: str) -> list[str]:
     return [r["source_doc"] for r in rows]
 
 
-def get_recent_history(developer_id: str, session_id: str, limit: int = 6) -> list[dict]:
+def get_recent_history(developer_id: int, session_id: int, limit: int = 6) -> list[dict]:
     """
     Return the most recent progress entries for a session.
     Used to build conversational context for the LLM.
+    Returns oldest-first so the LLM sees the conversation in order.
     """
     with _connect() as conn:
         rows = conn.execute(
@@ -172,15 +178,15 @@ def get_recent_history(developer_id: str, session_id: str, limit: int = 6) -> li
             SELECT topic, query, summary, source_doc, created_at
             FROM progress_tracking
             WHERE developer_id = ? AND session_id = ?
-            ORDER BY created_at DESC
+            ORDER BY id DESC
             LIMIT ?
             """,
             (developer_id, session_id, limit),
         ).fetchall()
-    return [dict(r) for r in reversed(rows)]   # oldest first for LLM context
+    return [dict(r) for r in reversed(rows)]
 
 
-def has_covered_topic(developer_id: str, topic: str) -> bool:
+def has_covered_topic(developer_id: int, topic: str) -> bool:
     """Return True if the developer has already covered this topic."""
     with _connect() as conn:
         row = conn.execute(
@@ -192,11 +198,12 @@ def has_covered_topic(developer_id: str, topic: str) -> bool:
 
 # ── Learning Path ─────────────────────────────────────────────────────────────
 
-def save_learning_path(developer_id: str, docs: list[dict]) -> None:
+def save_learning_path(developer_id: int, docs: list[dict]) -> None:
     """
     Persist a generated learning path.
-    Each doc: {doc_path, doc_title, category, priority_order, reason}
+    Each doc dict: {doc_path, doc_title, category, priority_order, reason}
     Clears the previous path for this developer before inserting.
+    id is auto-assigned for each new row.
     """
     with _connect() as conn:
         conn.execute(
@@ -206,7 +213,6 @@ def save_learning_path(developer_id: str, docs: list[dict]) -> None:
 
         records = [
             {
-                "id":            str(uuid.uuid4()),
                 "developer_id":  developer_id,
                 "doc_path":      doc["doc_path"],
                 "doc_title":     doc["doc_title"],
@@ -225,17 +231,17 @@ def save_learning_path(developer_id: str, docs: list[dict]) -> None:
         conn.executemany(
             """
             INSERT INTO learning_path
-                (id, developer_id, doc_path, doc_title, category, priority_order,
+                (developer_id, doc_path, doc_title, category, priority_order,
                  reason, status, started_at, completed_at, created_at, updated_at)
             VALUES
-                (:id, :developer_id, :doc_path, :doc_title, :category, :priority_order,
+                (:developer_id, :doc_path, :doc_title, :category, :priority_order,
                  :reason, :status, :started_at, :completed_at, :created_at, :updated_at)
             """,
             records,
         )
 
 
-def get_learning_path(developer_id: str) -> list[dict]:
+def get_learning_path(developer_id: int) -> list[dict]:
     """Return the full learning path for a developer, ordered by priority."""
     with _connect() as conn:
         rows = conn.execute(
@@ -249,7 +255,8 @@ def get_learning_path(developer_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def mark_doc_started(developer_id: str, doc_path: str) -> None:
+def mark_doc_started(developer_id: int, doc_path: str) -> None:
+    """Mark a document as in_progress if it was not_started."""
     with _connect() as conn:
         conn.execute(
             """
@@ -261,7 +268,8 @@ def mark_doc_started(developer_id: str, doc_path: str) -> None:
         )
 
 
-def mark_doc_completed(developer_id: str, doc_path: str) -> None:
+def mark_doc_completed(developer_id: int, doc_path: str) -> None:
+    """Mark a document as completed."""
     with _connect() as conn:
         conn.execute(
             """
@@ -273,7 +281,7 @@ def mark_doc_completed(developer_id: str, doc_path: str) -> None:
         )
 
 
-def get_next_unread_doc(developer_id: str) -> Optional[dict]:
+def get_next_unread_doc(developer_id: int) -> Optional[dict]:
     """
     Return the next not_started document in the learning path.
     Used by the proactive nudge logic.
@@ -291,7 +299,7 @@ def get_next_unread_doc(developer_id: str) -> Optional[dict]:
     return dict(row) if row else None
 
 
-def get_progress_summary(developer_id: str) -> dict:
+def get_progress_summary(developer_id: int) -> dict:
     """
     Return a summary of the developer's overall onboarding progress.
     Used by the orchestrator to decide whether to nudge.
@@ -317,16 +325,16 @@ def get_progress_summary(developer_id: str) -> dict:
             (developer_id,),
         ).fetchone()["c"]
 
-    stats = {r["status"]: r["count"] for r in path_stats}
+    stats      = {r["status"]: r["count"] for r in path_stats}
     total_docs = sum(stats.values())
 
     return {
-        "total_docs":       total_docs,
-        "completed":        stats.get("completed", 0),
-        "in_progress":      stats.get("in_progress", 0),
-        "not_started":      stats.get("not_started", total_docs),
-        "completion_pct":   round(stats.get("completed", 0) / max(total_docs, 1) * 100),
-        "total_questions":  total_questions,
-        "total_sessions":   total_sessions,
-        "should_nudge":     total_questions > 0 and total_questions % PROACTIVE_NUDGE_AFTER == 0,
+        "total_docs":      total_docs,
+        "completed":       stats.get("completed", 0),
+        "in_progress":     stats.get("in_progress", 0),
+        "not_started":     stats.get("not_started", total_docs),
+        "completion_pct":  round(stats.get("completed", 0) / max(total_docs, 1) * 100),
+        "total_questions": total_questions,
+        "total_sessions":  total_sessions,
+        "should_nudge":    total_questions > 0 and total_questions % PROACTIVE_NUDGE_AFTER == 0,
     }
