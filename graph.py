@@ -16,6 +16,8 @@
 #       ├─── ANSWER_QUESTION  ──▶  learning/RAG node    ──▶ response
 #       ├─── SHOW_PROGRESS    ──▶  progress node        ──▶ response
 #       ├─── PROACTIVE_NUDGE  ──▶  nudge node           ──▶ response
+#       ├─── HITL_CONFIRM     ──▶  hitl_confirm node    ──▶ "mark doc complete? yes/no"
+#       ├─── HITL_RESPONSE    ──▶  hitl_response node   ──▶ processes yes/no + updates DB
 #       └─── ESCALATE         ──▶  escalation node      ──▶ response
 
 from __future__ import annotations
@@ -33,6 +35,10 @@ from agents.orchestrator import (
     build_progress_response,
     build_escalation_response,
     build_small_talk_response,
+    build_hitl_confirm_message,
+    build_hitl_accepted_message,
+    build_hitl_declined_message,
+    classify_hitl_response,
     classify_intent,
 )
 from agents.profiler import (
@@ -47,7 +53,7 @@ from agents.learning import (
     format_learning_path_message,
 )
 from memory.profile_store import save_profile, get_profile, log_agent_action
-from memory.progress import start_session, end_session, get_progress_summary
+from memory.progress import start_session, end_session, get_progress_summary, get_hitl_candidate, record_doc_read
 
 
 # ── State schema ──────────────────────────────────────────────────────────────
@@ -72,6 +78,11 @@ class OnboardingState(TypedDict):
     # Routing
     current_route:        str
     error_count:          int
+
+    # HITL state — Human-in-the-Loop doc completion confirmation
+    hitl_pending:         bool          # True when waiting for Yes/No from developer
+    hitl_doc:             Optional[dict]# The doc awaiting confirmation
+    hitl_declined:        dict          # {doc_path: question_count_at_decline} — snooze tracker
 
 
 # ── Node implementations ──────────────────────────────────────────────────────
@@ -303,6 +314,120 @@ def escalate_node(state: OnboardingState) -> OnboardingState:
     }
 
 
+# ── HITL nodes ────────────────────────────────────────────────────────────────
+
+def hitl_confirm_node(state: OnboardingState) -> OnboardingState:
+    """
+    HITL interrupt — agent asks the developer whether to mark a doc complete.
+    Sets hitl_pending=True and stores the candidate doc in hitl_doc.
+    The next message from the developer will be routed to hitl_response_node.
+    """
+    profile  = state["profile"]
+    dev_id   = profile["id"]
+    declined = state.get("hitl_declined", {})
+
+    candidate = get_hitl_candidate(dev_id, declined)
+
+    if not candidate:
+        # Candidate disappeared between routing and node execution — fall through
+        return {**state, "current_route": Route.ANSWER_QUESTION.value}
+
+    message = build_hitl_confirm_message(candidate, profile.get("name", ""))
+
+    new_messages = [
+        HumanMessage(content=state["user_message"]),
+        AIMessage(content=message),
+    ]
+
+    return {
+        **state,
+        "messages":     new_messages,
+        "response":     message,
+        "hitl_pending": True,
+        "hitl_doc":     candidate,
+    }
+
+
+def hitl_response_node(state: OnboardingState) -> OnboardingState:
+    """
+    Processes the developer's Yes/No response to the HITL prompt.
+
+    Yes → record_doc_read() marks doc complete + updates progress/sessions tables
+    No  → store doc_path in hitl_declined with current question count (snooze)
+
+    Either way: clears hitl_pending so normal routing resumes.
+    """
+    profile    = state["profile"]
+    dev_id     = profile["id"]
+    session_id = state.get("session_id")
+    hitl_doc   = state.get("hitl_doc", {})
+    declined   = dict(state.get("hitl_declined", {}))
+
+    answer = classify_hitl_response(state["user_message"])
+
+    if answer == "YES":
+        # Mark the document as complete — updates all three tables correctly
+        record_doc_read(
+            developer_id=dev_id,
+            session_id=session_id,
+            doc_path=hitl_doc["doc_path"],
+            doc_title=hitl_doc["doc_title"],
+        )
+        response = build_hitl_accepted_message(hitl_doc)
+
+        log_agent_action(
+            dev_id, "HITL_ACCEPTED",
+            {"doc": hitl_doc["doc_path"], "doc_title": hitl_doc["doc_title"]},
+            session_id=session_id,
+        )
+
+    elif answer == "NO":
+        # Snooze — record the current question count so we know when to re-ask
+        from memory.progress import get_questions_per_doc
+        q_counts = get_questions_per_doc(dev_id)
+        declined[hitl_doc["doc_path"]] = q_counts.get(hitl_doc["doc_path"], 0)
+        response = build_hitl_declined_message(hitl_doc)
+
+        log_agent_action(
+            dev_id, "HITL_DECLINED",
+            {"doc": hitl_doc["doc_path"], "doc_title": hitl_doc["doc_title"]},
+            session_id=session_id,
+        )
+
+    else:
+        # Unclear response — ask again gently
+        response = (
+            f"I didn't quite catch that! Just reply **yes** to mark "
+            f"**{hitl_doc.get('doc_title', 'the document')}** as complete, "
+            f"or **no** to keep it open."
+        )
+        # Leave hitl_pending=True so the next message comes back here
+        new_messages = [
+            HumanMessage(content=state["user_message"]),
+            AIMessage(content=response),
+        ]
+        return {
+            **state,
+            "messages":     new_messages,
+            "response":     response,
+            "hitl_pending": True,   # still waiting
+        }
+
+    new_messages = [
+        HumanMessage(content=state["user_message"]),
+        AIMessage(content=response),
+    ]
+
+    return {
+        **state,
+        "messages":      new_messages,
+        "response":      response,
+        "hitl_pending":  False,      # clear the interrupt
+        "hitl_doc":      None,
+        "hitl_declined": declined,
+    }
+
+
 # ── Routing function ──────────────────────────────────────────────────────────
 
 def route_from_orchestrator(state: OnboardingState) -> str:
@@ -315,6 +440,8 @@ def route_from_orchestrator(state: OnboardingState) -> str:
         Route.SHOW_PROGRESS.value:   "show_progress",
         Route.PROACTIVE_NUDGE.value: "nudge",
         Route.ESCALATE.value:        "escalate",
+        Route.HITL_CONFIRM.value:    "hitl_confirm",
+        Route.HITL_RESPONSE.value:   "hitl_response",
     }
     return route_map.get(state.get("current_route", ""), "answer_question")
 
@@ -337,6 +464,8 @@ def build_graph() -> StateGraph:
     graph.add_node("show_progress",   progress_node)
     graph.add_node("nudge",           nudge_node)
     graph.add_node("escalate",        escalate_node)
+    graph.add_node("hitl_confirm",    hitl_confirm_node)
+    graph.add_node("hitl_response",   hitl_response_node)
 
     # ── Entry point ────────────────────────────────────────────────────────
     graph.set_entry_point("orchestrator")
@@ -353,12 +482,15 @@ def build_graph() -> StateGraph:
             "show_progress":   "show_progress",
             "nudge":           "nudge",
             "escalate":        "escalate",
+            "hitl_confirm":    "hitl_confirm",
+            "hitl_response":   "hitl_response",
         },
     )
 
     # ── All nodes terminate after responding ───────────────────────────────
     for node in ["profile", "provision", "generate_path", "answer_question",
-                 "show_progress", "nudge", "escalate"]:
+                 "show_progress", "nudge", "escalate",
+                 "hitl_confirm", "hitl_response"]:
         graph.add_edge(node, END)
 
     return graph.compile()
@@ -388,6 +520,9 @@ def create_initial_state(session_id: Optional[int] = None) -> OnboardingState:
         path_generated=False,
         current_route=Route.PROFILE.value,
         error_count=0,
+        hitl_pending=False,
+        hitl_doc=None,
+        hitl_declined={},
     )
 
 

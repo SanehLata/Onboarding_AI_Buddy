@@ -3,9 +3,6 @@
 # Tracks what a developer has covered across sessions.
 # Powers the "don't repeat yourself" and proactive nudge behaviour
 # of the Learning Path agent.
-#
-# Primary keys are INTEGER AUTOINCREMENT throughout.
-# session_id is an int FK to sessions.id — not a UUID string.
 
 import sqlite3
 import json
@@ -343,6 +340,83 @@ def get_next_unread_doc(developer_id: int) -> Optional[dict]:
             (developer_id,),
         ).fetchone()
     return dict(row) if row else None
+
+
+def get_questions_per_doc(developer_id: int) -> dict[str, int]:
+    """
+    Return a count of how many questions the developer has asked about each
+    source document — excluding [READ] marker entries.
+
+    Used by HITL logic to decide when to ask the developer to mark a doc complete.
+
+    Returns: { "runbooks/deployment_guide.md": 3, "onboarding/vpn_access.md": 1, ... }
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT source_doc, COUNT(*) as question_count
+            FROM progress_tracking
+            WHERE developer_id = ?
+              AND source_doc IS NOT NULL
+              AND query NOT LIKE '[READ]%'
+            GROUP BY source_doc
+            """,
+            (developer_id,),
+        ).fetchall()
+    return {r["source_doc"]: r["question_count"] for r in rows}
+
+
+def get_hitl_candidate(
+    developer_id: int,
+    hitl_declined: dict[str, int],
+) -> Optional[dict]:
+    """
+    Find a document that qualifies for HITL completion confirmation.
+
+    Qualifies when:
+      - Developer has asked >= HITL_QUESTIONS_PER_DOC questions about it
+      - Document is still not_started or in_progress in learning_path
+      - Developer hasn't already declined, OR declined but asked
+        HITL_SNOOZE_AFTER more questions about it since declining
+
+    hitl_declined: { doc_path: question_count_at_time_of_decline }
+                   Stored in graph state, not DB — resets each session.
+
+    Returns the learning_path row dict, or None if no candidate found.
+    """
+    from config import HITL_QUESTIONS_PER_DOC, HITL_SNOOZE_AFTER
+
+    questions_per_doc = get_questions_per_doc(developer_id)
+
+    with _connect() as conn:
+        unfinished = conn.execute(
+            """
+            SELECT * FROM learning_path
+            WHERE developer_id = ?
+              AND status IN ('not_started', 'in_progress')
+            ORDER BY priority_order
+            """,
+            (developer_id,),
+        ).fetchall()
+
+    for row in unfinished:
+        doc_path      = row["doc_path"]
+        question_count = questions_per_doc.get(doc_path, 0)
+
+        # Not enough questions about this doc yet
+        if question_count < HITL_QUESTIONS_PER_DOC:
+            continue
+
+        # Check snooze — if developer declined, wait for HITL_SNOOZE_AFTER more
+        if doc_path in hitl_declined:
+            count_at_decline  = hitl_declined[doc_path]
+            questions_since   = question_count - count_at_decline
+            if questions_since < HITL_SNOOZE_AFTER:
+                continue        # still in snooze window — skip
+
+        return dict(row)
+
+    return None
 
 
 def get_progress_summary(developer_id: int) -> dict:

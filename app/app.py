@@ -387,10 +387,12 @@ def render_sidebar() -> None:
         st.markdown('<div class="section-label" style="margin-top:1rem;">Onboarding Status</div>',
                     unsafe_allow_html=True)
 
+        hitl_active = st.session_state.graph_state.get("hitl_pending", False)
         flags = [
             ("Profile collected",    bool(profile.get("name"))),
             ("Access provisioned",   _is_provisioned()),
             ("Learning path ready",  _path_generated()),
+            ("Awaiting confirmation", hitl_active),
         ]
         for label, done in flags:
             icon  = "✅" if done else "⏳"
@@ -474,8 +476,35 @@ def render_chat_tab() -> None:
         with st.chat_message(msg["role"], avatar="🧑‍💻" if msg["role"] == "user" else "🤝"):
             st.markdown(msg["content"])
 
+    # HITL banner — shown when agent is waiting for Yes/No response
+    hitl_pending = st.session_state.graph_state.get("hitl_pending", False)
+    hitl_doc     = st.session_state.graph_state.get("hitl_doc")
+
+    if hitl_pending and hitl_doc:
+        st.markdown(f"""
+        <div style="background:#2d2000;border:1px solid #9e6a03;border-radius:10px;
+                    padding:0.8rem 1.1rem;margin-bottom:0.8rem;display:flex;
+                    align-items:center;gap:0.8rem;">
+            <span style="font-size:1.1rem;">⏳</span>
+            <div>
+                <div style="font-size:0.82rem;font-weight:600;color:#e3b341;">
+                    Waiting for your response
+                </div>
+                <div style="font-size:0.75rem;color:#9e7a30;margin-top:2px;">
+                    Reply <strong>yes</strong> to mark
+                    <strong>{hitl_doc.get("doc_title", "the document")}</strong>
+                    as complete, or <strong>no</strong> to keep it open.
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Chat input
-    if user_input := st.chat_input("Ask me anything about your onboarding..."):
+    placeholder_text = (
+        "Type yes or no..." if hitl_pending
+        else "Ask me anything about your onboarding..."
+    )
+    if user_input := st.chat_input(placeholder_text):
         _send_message(user_input)
         st.rerun()
 

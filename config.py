@@ -44,3 +44,5 @@ CHUNK_OVERLAP = 100
 MAX_RETRIES           = 3          # tool call retry attempts
 RETRY_DELAY_SECONDS   = 2          # wait between retries
 PROACTIVE_NUDGE_AFTER = 3          # suggest next topic after N questions answered
+HITL_QUESTIONS_PER_DOC = 3         # ask to mark doc complete after N questions about it
+HITL_SNOOZE_AFTER      = 3         # if dev says No, ask again after N more questions about same doc
