@@ -21,7 +21,7 @@
       },
       "access_levels": ["viewer", "developer", "admin"],
       "default_access_level": "developer",
-      "requires_manager_approval": false,
+      "requires_approval": false,
       "requires_security_review": false,
       "onboarding_notes": "All new developers get developer-level access by default. Request admin access separately if required."
     },
@@ -46,7 +46,7 @@
       },
       "access_levels": ["viewer", "contributor", "space_admin"],
       "default_access_level": "contributor",
-      "requires_manager_approval": false,
+      "requires_approval": false,
       "requires_security_review": false,
       "onboarding_notes": "Contributors can read and edit all pages. Space admin access requires team lead approval."
     },
@@ -71,7 +71,7 @@
       },
       "access_levels": ["read_only", "requester", "fulfiller", "admin"],
       "default_access_level": "requester",
-      "requires_manager_approval": true,
+      "requires_approval": true,
       "requires_security_review": false,
       "onboarding_notes": "Manager approval is required. Most engineers receive requester access to raise and track tickets."
     },
@@ -96,7 +96,7 @@
       },
       "access_levels": ["read", "write", "maintain", "admin"],
       "default_access_level": "write",
-      "requires_manager_approval": true,
+      "requires_approval": true,
       "requires_security_review": false,
       "onboarding_notes": "GitHub access is a Day 1 priority. Manager must approve. Developer is added to team-specific repos only. Request additional repo access separately."
     },
@@ -121,7 +121,7 @@
       },
       "access_levels": ["dev_only", "dev_staging", "full_non_prod", "prod_read", "prod_write"],
       "default_access_level": "dev_staging",
-      "requires_manager_approval": true,
+      "requires_approval": true,
       "requires_security_review": true,
       "environments": ["development", "staging", "production"],
       "onboarding_notes": "Security review is mandatory. New joiners get dev and staging access initially. Production access requires a separate request after 30 days and a security sign-off."
@@ -147,7 +147,7 @@
       },
       "access_levels": ["read_raw", "read_curated", "read_write_sandbox", "read_write_prod"],
       "default_access_level": "read_curated",
-      "requires_manager_approval": true,
+      "requires_approval": true,
       "requires_security_review": true,
       "onboarding_notes": "Data governance review required. New joiners receive read access to curated datasets. Write access to production schemas requires a data steward approval."
     }

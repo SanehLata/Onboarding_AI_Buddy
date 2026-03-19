@@ -7,7 +7,7 @@
         {
           "dl_id": "dl_payments_eng",
           "dl_name": "Payments Engineering Team",
-          "email": "payments-eng@techcorp.com",
+          "dl_email": "payments-eng@techcorp.com",
           "type": "team",
           "description": "Core Payments Engineering team distribution list. All team announcements and discussions.",
           "owner_name": "Sarah Mitchell",
@@ -23,7 +23,7 @@
         {
           "dl_id": "dl_payments_alerts",
           "dl_name": "Payments Alerts & Incidents",
-          "email": "payments-alerts@techcorp.com",
+          "dl_email": "payments-alerts@techcorp.com",
           "type": "alerts",
           "description": "Receives automated alerts, incident notifications, and on-call pages for payment systems.",
           "owner_name": "Sarah Mitchell",
@@ -39,7 +39,7 @@
         {
           "dl_id": "dl_engineering_general",
           "dl_name": "Engineering All Hands",
-          "email": "engineering@techcorp.com",
+          "dl_email": "engineering@techcorp.com",
           "type": "org_wide",
           "description": "Company-wide engineering distribution list for all-hands updates and org announcements.",
           "owner_name": "CTO Office",
@@ -61,7 +61,7 @@
         {
           "dl_id": "dl_risk_eng",
           "dl_name": "Risk Engineering Team",
-          "email": "risk-eng@techcorp.com",
+          "dl_email": "risk-eng@techcorp.com",
           "type": "team",
           "description": "Core Risk & Compliance Engineering distribution list for team communications.",
           "owner_name": "James Thornton",
@@ -77,7 +77,7 @@
         {
           "dl_id": "dl_fraud_alerts",
           "dl_name": "Fraud Detection Alerts",
-          "email": "fraud-alerts@techcorp.com",
+          "dl_email": "fraud-alerts@techcorp.com",
           "type": "alerts",
           "description": "Fraud model alerts, threshold breach notifications, and risk escalations.",
           "owner_name": "James Thornton",
@@ -93,7 +93,7 @@
         {
           "dl_id": "dl_ml_models",
           "dl_name": "ML Models & Data Science",
-          "email": "ml-models@techcorp.com",
+          "dl_email": "ml-models@techcorp.com",
           "type": "community",
           "description": "Cross-team ML practitioners group. Model releases, experiment discussions, and data science updates.",
           "owner_name": "James Thornton",
@@ -109,7 +109,7 @@
         {
           "dl_id": "dl_engineering_general",
           "dl_name": "Engineering All Hands",
-          "email": "engineering@techcorp.com",
+          "dl_email": "engineering@techcorp.com",
           "type": "org_wide",
           "description": "Company-wide engineering distribution list.",
           "owner_name": "CTO Office",
@@ -131,7 +131,7 @@
         {
           "dl_id": "dl_platform_eng",
           "dl_name": "Platform Engineering Team",
-          "email": "platform-eng@techcorp.com",
+          "dl_email": "platform-eng@techcorp.com",
           "type": "team",
           "description": "Core Platform Engineering team distribution list.",
           "owner_name": "Priya Sharma",
@@ -147,7 +147,7 @@
         {
           "dl_id": "dl_infra_alerts",
           "dl_name": "Infrastructure Alerts",
-          "email": "infra-alerts@techcorp.com",
+          "dl_email": "infra-alerts@techcorp.com",
           "type": "alerts",
           "description": "Infrastructure health alerts, Kubernetes cluster notifications, and deployment pipeline statuses.",
           "owner_name": "Priya Sharma",
@@ -163,7 +163,7 @@
         {
           "dl_id": "dl_deployments",
           "dl_name": "Deployments & Releases",
-          "email": "deployments@techcorp.com",
+          "dl_email": "deployments@techcorp.com",
           "type": "operational",
           "description": "Deployment notifications, release announcements, and rollback alerts across all services.",
           "owner_name": "Priya Sharma",
@@ -179,7 +179,7 @@
         {
           "dl_id": "dl_engineering_general",
           "dl_name": "Engineering All Hands",
-          "email": "engineering@techcorp.com",
+          "dl_email": "engineering@techcorp.com",
           "type": "org_wide",
           "description": "Company-wide engineering distribution list.",
           "owner_name": "CTO Office",
@@ -201,7 +201,7 @@
         {
           "dl_id": "dl_data_eng",
           "dl_name": "Data Engineering Team",
-          "email": "data-eng@techcorp.com",
+          "dl_email": "data-eng@techcorp.com",
           "type": "team",
           "description": "Core Data Engineering team distribution list for team communications.",
           "owner_name": "Marcus Lee",
@@ -217,7 +217,7 @@
         {
           "dl_id": "dl_pipeline_alerts",
           "dl_name": "Pipeline Alerts",
-          "email": "pipeline-alerts@techcorp.com",
+          "dl_email": "pipeline-alerts@techcorp.com",
           "type": "alerts",
           "description": "Airflow DAG failures, pipeline SLA breaches, and data quality alerts.",
           "owner_name": "Marcus Lee",
@@ -233,7 +233,7 @@
         {
           "dl_id": "dl_analytics",
           "dl_name": "Analytics Community",
-          "email": "analytics@techcorp.com",
+          "dl_email": "analytics@techcorp.com",
           "type": "community",
           "description": "Cross-functional analytics community. Data analysts, engineers, and business stakeholders.",
           "owner_name": "Marcus Lee",
@@ -249,7 +249,7 @@
         {
           "dl_id": "dl_engineering_general",
           "dl_name": "Engineering All Hands",
-          "email": "engineering@techcorp.com",
+          "dl_email": "engineering@techcorp.com",
           "type": "org_wide",
           "description": "Company-wide engineering distribution list.",
           "owner_name": "CTO Office",
@@ -271,7 +271,7 @@
         {
           "dl_id": "dl_auth_eng",
           "dl_name": "Auth & Identity Team",
-          "email": "auth-eng@techcorp.com",
+          "dl_email": "auth-eng@techcorp.com",
           "type": "team",
           "description": "Core Auth & Identity Engineering team distribution list.",
           "owner_name": "Rachel Kim",
@@ -287,7 +287,7 @@
         {
           "dl_id": "dl_security_alerts",
           "dl_name": "Security Alerts",
-          "email": "security-alerts@techcorp.com",
+          "dl_email": "security-alerts@techcorp.com",
           "type": "alerts",
           "description": "Security incident alerts, vulnerability notifications, and access anomaly reports.",
           "owner_name": "Rachel Kim",
@@ -303,7 +303,7 @@
         {
           "dl_id": "dl_identity_platform",
           "dl_name": "Identity Platform Updates",
-          "email": "identity-platform@techcorp.com",
+          "dl_email": "identity-platform@techcorp.com",
           "type": "operational",
           "description": "SSO changes, identity provider updates, and auth service release notes.",
           "owner_name": "Rachel Kim",
@@ -319,7 +319,7 @@
         {
           "dl_id": "dl_engineering_general",
           "dl_name": "Engineering All Hands",
-          "email": "engineering@techcorp.com",
+          "dl_email": "engineering@techcorp.com",
           "type": "org_wide",
           "description": "Company-wide engineering distribution list.",
           "owner_name": "CTO Office",

@@ -1,5 +1,6 @@
 pip install -r requirements.txt
 python data/seeds/gen_docs.py       # validate all 21 docs exist
+python data/seeds/validate_json_schema.py       # verify json schemas are in line with their usage
 python data/seeds/gen_db.py         # create SQLite DB + seed developers
 python data/seeds/embed_docs.py     # chunk → embed → store in ChromaDB
 streamlit run app/main.py           # launch the app
@@ -13,3 +14,7 @@ langchain-huggingface
 langchain-chroma
 chromadb
 sentence-transformers
+
+
+## Agent Graph
+![Agent Graph](docs/graph_diagram.png)

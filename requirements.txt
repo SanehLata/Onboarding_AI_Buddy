@@ -22,6 +22,7 @@ langchain-classic==1.0.3
 # ── LangGraph ─────────────────────────────────────────────────────────────────
 # 1.1.2 is compatible with langchain-core 1.2.x
 langgraph==1.0.10
+grandalf==0.8
 
 # ── LLM — Groq ───────────────────────────────────────────────────────────────
 langchain-groq==1.1.2

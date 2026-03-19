@@ -14,7 +14,8 @@ from config import (
     GROQ_API_KEY, LLM_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS, TEAMS_JSON
 )
 from memory.profile_store import (
-    save_profile, get_profile, log_agent_action, save_access_request,
+    save_profile, get_profile, get_profile_by_email,
+    list_all_profiles, log_agent_action, save_access_request,
     save_dl_subscription,
 )
 from tools.ticketing import provision_all_access
@@ -175,6 +176,73 @@ def get_profiler_response(
     clean_text = text.replace("PROFILE_READY", "").strip()
 
     return clean_text, profile_complete
+
+
+# ── Returning user detection ─────────────────────────────────────────────────
+
+_RETURNING_USER_SYSTEM = """
+You are the Onboarding Buddy for TechCorp Engineering.
+
+A developer has returned for a new session. Their profile is already on record:
+  Name             : {name}
+  Team             : {team_name}
+  Role             : {role_title}
+  Experience level : {experience_level}
+  Manager          : {manager_name}
+  Start date       : {start_date}
+
+Write a warm 2-3 sentence welcome back message. Include ALL of these points:
+1. Greet them by first name
+2. Confirm their profile is already saved — no need to re-enter anything
+3. Tell them their Access, Learning Path and Insights tabs are ready to view
+4. Invite them to ask any questions
+
+Example tone: "Welcome back, Alex! Your profile is still on record for the Payments team.
+Your access tickets, learning path and insights are all in the tabs above — feel free to check them,
+and ask me anything whenever you're ready."
+"""
+
+
+def check_returning_user(user_message: str) -> dict | None:
+    """
+    Check if the user's first message identifies them as a returning user.
+    Searches existing profiles by name match.
+
+    Returns the full profile dict if found, None if not found.
+    """
+    profiles = list_all_profiles()
+    if not profiles:
+        return None
+
+    # Simple name matching — check if any known name appears in the message
+    msg_lower = user_message.lower()
+    for profile in profiles:
+        name       = profile.get("name", "")
+        first_name = name.split()[0].lower() if name else ""
+        full_lower = name.lower()
+
+        # Match on full name or first name appearing in the message
+        if full_lower and full_lower in msg_lower:
+            return profile
+        if first_name and len(first_name) > 2 and first_name in msg_lower:
+            return profile
+
+    return None
+
+
+def build_returning_user_greeting(profile: dict) -> str:
+    """Build a warm returning-user greeting using the stored profile."""
+    llm = _get_llm()
+    system = _RETURNING_USER_SYSTEM.format(
+        name             = profile.get("name", ""),
+        team_name        = profile.get("team_name", ""),
+        role_title       = profile.get("role_title", ""),
+        experience_level = profile.get("experience_level", ""),
+        manager_name     = profile.get("manager_name", ""),
+        start_date       = profile.get("start_date", ""),
+    )
+    response = llm.invoke([SystemMessage(content=system)])
+    return response.content.strip()
 
 
 # ── Provisioning ──────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@
 #       ▼
 #   orchestrator (decide_route)
 #       │
+#       ├─── RETURNING_USER  ──▶  returning user node  ──▶ warm welcome, skip re-intake
 #       ├─── PROFILE         ──▶  profiler node        ──▶ response
 #       ├─── PROVISION        ──▶  provisioning node    ──▶ response
 #       ├─── GENERATE_PATH    ──▶  path generator node  ──▶ response
@@ -22,7 +23,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict, Annotated, Sequence
+from typing import TypedDict, Annotated, Sequence, Optional
 from datetime import date
 
 from langgraph.graph import StateGraph, END
@@ -46,6 +47,8 @@ from agents.profiler import (
     extract_profile_from_conversation,
     run_provisioning,
     build_provisioning_summary,
+    check_returning_user,
+    build_returning_user_greeting,
 )
 from agents.learning import (
     generate_learning_path,
@@ -54,6 +57,7 @@ from agents.learning import (
 )
 from memory.profile_store import save_profile, get_profile, log_agent_action
 from memory.progress import start_session, end_session, get_progress_summary, get_hitl_candidate, record_doc_read
+from config import log
 
 
 # ── State schema ──────────────────────────────────────────────────────────────
@@ -92,18 +96,81 @@ def orchestrator_node(state: OnboardingState) -> OnboardingState:
     Decide which node to call next based on current state and user message.
     Sets state['current_route'] — the conditional edge reads this.
     """
+    msg_preview = state["user_message"][:60].replace("\n", " ")
+    log.info(
+        f"[ORCHESTRATOR] msg='{msg_preview}' "
+        f"profile_complete={state.get('profile_complete')} "
+        f"provisioned={state.get('provisioning_complete')} "
+        f"path_generated={state.get('path_generated')} "
+        f"hitl_pending={state.get('hitl_pending')} "
+        f"error_count={state.get('error_count', 0)}"
+    )
     route = decide_route(state, state["user_message"])
+    log.info(f"[ORCHESTRATOR] → route={route.value.upper()}")
     return {**state, "current_route": route.value}
 
 
 def profile_node(state: OnboardingState) -> OnboardingState:
     """
     Continue the profiling conversation.
-    Extracts profile fields from the conversation history after each turn.
+    On the very first user message, checks if this is a returning user by name.
+    If found in DB, loads their profile and skips the full intake conversation.
+    Otherwise runs the normal profiling flow.
     """
     conversation_history = list(state["messages"])
     current_profile      = state.get("profile", {})
 
+    log.info(
+        f"[PROFILE_NODE] entry — "
+        f"name='{current_profile.get('name', 'unknown')}' "
+        f"msg_count={len(conversation_history)}"
+    )
+
+    # ── Returning user check — only on first real user message ───────────────
+    # Condition: no profile yet AND this is one of the first few messages
+    # (conversation_history will have only the bot greeting at this point)
+    is_first_message = len([
+        m for m in conversation_history
+        if isinstance(m, HumanMessage)
+    ]) == 0   # no human messages yet in state (this is the first one)
+
+    if is_first_message and not current_profile.get("id"):
+        returning_profile = check_returning_user(state["user_message"])
+        if returning_profile:
+            # Found in DB — load profile, start session, skip full intake
+            dev_id     = returning_profile["id"]
+            session_id = start_session(dev_id)
+            log.info(
+                f"[PROFILE_NODE] returning user detected — "
+                f"name='{returning_profile.get('name')}' "
+                f"dev_id={dev_id} new_session_id={session_id}"
+            )
+            greeting   = build_returning_user_greeting(returning_profile)
+
+            new_messages = [
+                HumanMessage(content=state["user_message"]),
+                AIMessage(content=greeting),
+            ]
+
+            log_agent_action(
+                dev_id, "RETURNING_USER_LOGIN",
+                {"name": returning_profile.get("name")},
+                session_id=session_id,
+            )
+
+            return {
+                **state,
+                "messages":             new_messages,
+                "response":             greeting,
+                "profile":              returning_profile,
+                "profile_complete":     True,
+                "provisioning_complete":True,   # already done on first login
+                "path_generated":       True,   # already generated on first login
+                "developer_id":         dev_id,
+                "session_id":           session_id,
+            }
+
+    # ── Normal profiling flow ─────────────────────────────────────────────────
     # Generate response
     response, profile_complete_signal = get_profiler_response(
         user_message=state["user_message"],
@@ -149,6 +216,12 @@ def profile_node(state: OnboardingState) -> OnboardingState:
 
         # Start a DB session now that we have a real developer_id
         session_id = start_session(dev_id)                  # returns int PK
+        log.info(
+            f"[PROFILE_NODE] profile complete — "
+            f"dev_id={dev_id} session_id={session_id} "
+            f"team='{updated_profile.get('team_name')}' "
+            f"level='{updated_profile.get('experience_level')}'"
+        )
 
         log_agent_action(
             dev_id, "PROFILE_COMPLETE",
@@ -183,7 +256,27 @@ def provision_node(state: OnboardingState) -> OnboardingState:
     """
     Run all provisioning actions (tickets, emails, AD groups) for a complete profile.
     """
+    dev_id = state["profile"].get("id")
+    log.info(
+        f"[PROVISION_NODE] starting — "
+        f"dev_id={dev_id} "
+        f"name='{state['profile'].get('name')}' "
+        f"team='{state['profile'].get('team_name')}'"
+    )
     updated_state = run_provisioning(state)
+
+    prov = updated_state.get("provisioning_results", {})
+    tickets_result = prov.get("tickets", {})
+    emails_result  = prov.get("dl_emails", {})
+    ad_result      = prov.get("ad_groups", {})
+    log.info(
+        f"[PROVISION_NODE] complete — "
+        f"tickets_raised={tickets_result.get('tickets_raised', 0)} "
+        f"tickets_failed={tickets_result.get('tickets_failed', 0)} "
+        f"emails_sent={emails_result.get('emails_sent', 0)} "
+        f"ad_groups={ad_result.get('requests_submitted', 0)}"
+    )
+
     summary       = build_provisioning_summary(
         updated_state["provisioning_results"],
         state["profile"].get("name", ""),
@@ -209,7 +302,14 @@ def generate_path_node(state: OnboardingState) -> OnboardingState:
     profile     = state["profile"]
     session_id  = state.get("session_id", "")
 
+    log.info(
+        f"[GENERATE_PATH_NODE] generating — "
+        f"dev_id={profile.get('id')} "
+        f"team='{profile.get('team_name')}' "
+        f"level='{profile.get('experience_level')}'"
+    )
     path_docs = generate_learning_path(profile, session_id)
+    log.info(f"[GENERATE_PATH_NODE] generated {len(path_docs)} documents for learning path")
     message   = format_learning_path_message(path_docs, profile.get("name", ""))
 
     new_messages = [
@@ -232,10 +332,21 @@ def answer_question_node(state: OnboardingState) -> OnboardingState:
     profile    = state["profile"]
     session_id = state.get("session_id")   # int or None
 
+    log.info(
+        f"[ANSWER_QUESTION_NODE] query='{state['user_message'][:70]}' "
+        f"dev_id={profile.get('id')} session_id={session_id}"
+    )
     result = answer_question(
         query=state["user_message"],
         profile=profile,
         session_id=session_id,
+    )
+
+    log.info(
+        f"[ANSWER_QUESTION_NODE] answered — "
+        f"source_doc='{result.get('source_doc', 'none')}' "
+        f"topic='{result.get('topic', 'none')}' "
+        f"answer_len={len(result['answer'])}"
     )
 
     # If the LLM couldn't find an answer, increment error tracking
@@ -259,6 +370,7 @@ def answer_question_node(state: OnboardingState) -> OnboardingState:
 def progress_node(state: OnboardingState) -> OnboardingState:
     """Return a detailed progress summary for the developer."""
     profile    = state["profile"]
+    log.info(f"[PROGRESS_NODE] dev_id={profile.get('id')} name='{profile.get('name')}'")
     response   = build_progress_response(
         developer_id=profile["id"],
         developer_name=profile.get("name", ""),
@@ -275,6 +387,7 @@ def progress_node(state: OnboardingState) -> OnboardingState:
 def nudge_node(state: OnboardingState) -> OnboardingState:
     """Proactively suggest the next unread document."""
     profile  = state["profile"]
+    log.info(f"[NUDGE_NODE] proactive nudge triggered — dev_id={profile.get('id')}")
     response = build_proactive_nudge_response(
         developer_id=profile["id"],
         developer_name=profile.get("name", ""),
@@ -292,6 +405,11 @@ def escalate_node(state: OnboardingState) -> OnboardingState:
     """Handle escalation when repeated errors occur."""
     profile    = state.get("profile", {})
     dev_id     = profile.get("id", "unknown")
+    log.warning(
+        f"[ESCALATE_NODE] escalating — "
+        f"dev_id={dev_id} "
+        f"error_count={state.get('error_count', 0)}"
+    )
     response   = build_escalation_response()
 
     if dev_id != "unknown":
@@ -326,12 +444,17 @@ def hitl_confirm_node(state: OnboardingState) -> OnboardingState:
     dev_id   = profile["id"]
     declined = state.get("hitl_declined", {})
 
+    log.info(f"[HITL_CONFIRM_NODE] checking candidate — dev_id={dev_id}")
     candidate = get_hitl_candidate(dev_id, declined)
 
     if not candidate:
         # Candidate disappeared between routing and node execution — fall through
         return {**state, "current_route": Route.ANSWER_QUESTION.value}
 
+    log.info(
+        f"[HITL_CONFIRM_NODE] interrupt triggered — "
+        f"doc='{candidate['doc_title']}' path='{candidate['doc_path']}'"
+    )
     message = build_hitl_confirm_message(candidate, profile.get("name", ""))
 
     new_messages = [
@@ -364,6 +487,10 @@ def hitl_response_node(state: OnboardingState) -> OnboardingState:
     declined   = dict(state.get("hitl_declined", {}))
 
     answer = classify_hitl_response(state["user_message"])
+    log.info(
+        f"[HITL_RESPONSE_NODE] response classified='{answer}' "
+        f"doc='{hitl_doc.get('doc_title')}' dev_id={dev_id}"
+    )
 
     if answer == "YES":
         # Mark the document as complete — updates all three tables correctly
