@@ -267,10 +267,15 @@ def answer_question(
     query: str,
     profile: dict,
     session_id: str,
+    last_nudge_count: int = 0,
 ) -> dict:
     """
     Answer a developer's question using RAG over the knowledge base.
     Records the topic in progress tracking.
+
+    last_nudge_count: total_questions when nudge last fired (from graph state).
+    Used to prevent the inline nudge from appending on the same count that
+    the routing-level nudge already fired on.
 
     Returns:
     {
@@ -364,23 +369,33 @@ def answer_question(
         )
 
     # Record progress
-    if topic:
+    # Guard: skip if topic is missing or the LLM returned the literal "None"
+    valid_topic = topic and topic.lower() != "none"
+    valid_source = source_doc and source_doc.lower() != "none"
+
+    if valid_topic:
         record_progress(
             developer_id=profile["id"],
             session_id=session_id,
             topic=topic,
             query=query,
             summary=clean_answer[:200],
-            source_doc=source_doc,
+            source_doc=source_doc if valid_source else None,
         )
 
-        if source_doc:
+        if valid_source:
             mark_doc_started(profile["id"], source_doc)
 
     # Proactive nudge — suggest next unread doc
+    # Guard: same last_nudge_count check as orchestrator.py to prevent
+    # appending the inline nudge when it has already fired this session.
     summary = get_progress_summary(profile["id"])
     nudge   = None
-    if summary["should_nudge"]:
+    nudge_ready = (
+        summary["should_nudge"]
+        and summary["total_questions"] != last_nudge_count
+    )
+    if nudge_ready:
         next_doc = get_next_unread_doc(profile["id"])
         if next_doc:
             log.info(

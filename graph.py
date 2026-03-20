@@ -373,6 +373,7 @@ def answer_question_node(state: OnboardingState) -> OnboardingState:
         query=state["user_message"],
         profile=profile,
         session_id=session_id,
+        last_nudge_count=state.get("last_nudge_count", 0),
     )
 
     log.info(
