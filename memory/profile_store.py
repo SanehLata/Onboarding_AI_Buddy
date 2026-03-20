@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from config import DB_PATH
+from config import DB_PATH, log
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -51,6 +51,10 @@ def save_profile(profile: dict) -> int:
 
         if existing:
             dev_id = existing["id"]
+            log.info(
+                "[PROFILE_STORE] UPDATE developer_profiles — dev_id=%s email='%s'",
+                dev_id, profile.get("email")
+            )
             conn.execute(
                 """
                 UPDATE developer_profiles SET
@@ -104,6 +108,11 @@ def save_profile(profile: dict) -> int:
                 },
             )
             dev_id = cursor.lastrowid   # auto-assigned integer PK
+            log.info(
+                "[PROFILE_STORE] INSERT developer_profiles — dev_id=%s name='%s' "
+                "email='%s' team='%s'",
+                dev_id, profile.get("name"), profile.get("email"), profile.get("team_name")
+            )
 
     return dev_id
 
@@ -142,6 +151,10 @@ def get_profile_by_email(email: str) -> Optional[dict]:
 
 def update_onboarding_status(developer_id: int, status: str) -> None:
     """Update onboarding status: pending | in_progress | completed."""
+    log.info(
+        "[PROFILE_STORE] UPDATE onboarding_status — dev_id=%s status='%s'",
+        developer_id, status
+    )
     with _connect() as conn:
         conn.execute(
             "UPDATE developer_profiles SET onboarding_status = ?, updated_at = ? WHERE id = ?",
@@ -203,7 +216,15 @@ def save_access_request(developer_id: int, request: dict) -> int:
                 "updated_at":       _now(),
             },
         )
-        return cursor.lastrowid
+        req_id = cursor.lastrowid
+        log.info(
+            "[PROFILE_STORE] INSERT access_requests — req_id=%s dev_id=%s "
+            "system='%s' ticket_id='%s' requires_approval=%s",
+            req_id, developer_id,
+            request.get("system_name"), request.get("ticket_id"),
+            bool(request.get("requires_approval"))
+        )
+        return req_id
 
 
 def update_access_request_status(
@@ -212,6 +233,10 @@ def update_access_request_status(
     ticket_id: str = None,
 ) -> None:
     """Update the status of an access request, optionally storing the ticket ID."""
+    log.info(
+        "[PROFILE_STORE] UPDATE access_requests — req_id=%s status='%s' ticket_id='%s'",
+        request_id, status, ticket_id
+    )
     with _connect() as conn:
         if ticket_id:
             conn.execute(
@@ -268,7 +293,15 @@ def save_dl_subscription(developer_id: int, subscription: dict) -> int:
                 "updated_at":   _now(),
             },
         )
-        return cursor.lastrowid
+        sub_id = cursor.lastrowid
+        log.info(
+            "[PROFILE_STORE] INSERT dl_subscriptions — sub_id=%s dev_id=%s "
+            "dl_name='%s' dl_email='%s' owner='%s'",
+            sub_id, developer_id,
+            subscription.get("dl_name"), subscription.get("dl_email"),
+            subscription.get("owner_name")
+        )
+        return sub_id
 
 
 def get_dl_subscriptions(developer_id: int) -> list[dict]:
@@ -292,6 +325,18 @@ def log_agent_action(
     error: str = None,
 ) -> None:
     """Write an entry to the agent action audit log."""
+    if status == "success":
+        log.info(
+            "[PROFILE_STORE] INSERT agent_action_log — dev_id=%s session_id=%s "
+            "action='%s' status=%s",
+            developer_id, session_id, action_type, status
+        )
+    else:
+        log.warning(
+            "[PROFILE_STORE] INSERT agent_action_log — dev_id=%s session_id=%s "
+            "action='%s' status=%s error='%s'",
+            developer_id, session_id, action_type, status, error
+        )
     with _connect() as conn:
         conn.execute(
             """

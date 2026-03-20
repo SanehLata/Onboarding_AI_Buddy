@@ -22,6 +22,7 @@ st.set_page_config(
 )
 
 from graph import create_initial_state, process_message
+from config import log
 from memory.progress import (
     get_progress_summary,
     get_learning_path,
@@ -249,6 +250,8 @@ html, body, [class*="css"] {
 
 def _init_session() -> None:
     if "graph_state" not in st.session_state:
+        # Only log on true first load — session_state is empty before this
+        log.info("[APP] new browser session initialised")
         st.session_state.graph_state = create_initial_state()
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
@@ -302,18 +305,31 @@ def _read_doc(doc_path: str) -> str:
         full_path = ROOT / "data" / "mock_docs" / doc_path
         if full_path.exists():
             return full_path.read_text(encoding="utf-8")
+        log.warning("[APP] _read_doc — file not found: %s", full_path)
         return "_Document file not found._"
     except Exception as e:
+        log.error("[APP] _read_doc — error reading '%s': %s", doc_path, e)
         return f"_Could not load document: {e}_"
 
 
 def _send_message(user_input: str) -> None:
     """Process a message and update state. Called from render_chat_tab."""
+    dev_id = _dev_id()
+    log.info(
+        "[APP] user message — dev_id=%s msg_len=%d msg='%s'",
+        dev_id, len(user_input), user_input[:80]
+    )
     response, updated_state = process_message(
         st.session_state.graph_state, user_input
     )
     st.session_state.graph_state = updated_state
     st.session_state.chat_history.append({"role": "assistant", "content": response})
+    log.info(
+        "[APP] bot response — dev_id=%s route='%s' response_len=%d",
+        dev_id,
+        updated_state.get("current_route", "unknown"),
+        len(response)
+    )
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -414,6 +430,14 @@ def render_sidebar() -> None:
 
         # ── Reset button ──────────────────────────────────────────────────────
         if st.button("🔄 Start New Session", use_container_width=True):
+            dev_id = _dev_id()
+            log.info(
+                "[APP] session reset — dev_id=%s name='%s' "
+                "messages_in_session=%d",
+                dev_id,
+                _profile().get("name", "unknown"),
+                len(st.session_state.chat_history)
+            )
             st.session_state.graph_state  = create_initial_state()
             st.session_state.chat_history = []
             st.session_state.greeted      = False
@@ -486,6 +510,7 @@ def render_chat_tab() -> None:
             with col:
                 if st.button(prompt, use_container_width=True,
                              key=f"starter_{prompt[:15]}"):
+                    log.info("[APP] starter prompt clicked — '%s'", prompt)
                     st.session_state.chat_history.append(
                         {"role": "user", "content": prompt}
                     )
@@ -711,6 +736,10 @@ def render_learning_tab() -> None:
                     if doc["status"] in ("not_started", "in_progress") and session_id:
                         btn_key = f"read_{doc['doc_path'].replace('/', '_')}"
                         if st.button("✅ Mark read", key=btn_key, type="secondary"):
+                            log.info(
+                                "[APP] mark as read — dev_id=%s doc='%s' session_id=%s",
+                                dev_id, doc["doc_path"], session_id
+                            )
                             record_doc_read(
                                 developer_id=dev_id,
                                 session_id=session_id,

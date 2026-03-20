@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from config import TEAMS_JSON, SYSTEMS_JSON, MAX_RETRIES, RETRY_DELAY_SECONDS
+from config import TEAMS_JSON, SYSTEMS_JSON, MAX_RETRIES, RETRY_DELAY_SECONDS, log
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -94,8 +94,18 @@ def create_ticket(
     """
     system = _get_system(system_id)
     if not system:
+        log.error(
+            "[TICKETING] create_ticket — system_id='%s' not found in systems.json",
+            system_id
+        )
         return _error_response(system_id, system_id, f"System '{system_id}' not found in systems.json")
 
+    log.info(
+        "[TICKETING] create_ticket — system='%s' developer='%s' team='%s' "
+        "requires_approval=%s",
+        system.get("system_name"), developer_name, team_name,
+        system.get("requires_approval")
+    )
     attempt = 0
     last_error = None
 
@@ -117,6 +127,13 @@ def create_ticket(
             summary = system["ticket_summary_template"].format(
                 developer_name=developer_name,
                 team_name=team_name,
+            )
+
+            log.info(
+                "[TICKETING] ticket raised — ticket_id='%s' system='%s' "
+                "type='%s' sla_hours=%s attempts=%d",
+                ticket_id, system["system_name"], system["ticket_type"],
+                system["sla"]["resolution_hours"], attempt
             )
 
             return {
@@ -146,10 +163,19 @@ def create_ticket(
 
         except Exception as exc:
             last_error = str(exc)
+            log.warning(
+                "[TICKETING] attempt %d/%d failed — system='%s' error='%s'",
+                attempt, MAX_RETRIES, system.get("system_name"), last_error
+            )
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS)
 
     # All retries exhausted
+    log.error(
+        "[TICKETING] create_ticket FAILED — system='%s' developer='%s' "
+        "after %d attempts last_error='%s'",
+        system.get("system_name"), developer_name, MAX_RETRIES, last_error
+    )
     return _error_response(
         system_id,
         system.get("system_name", system_id),
@@ -194,6 +220,10 @@ def provision_all_access(
     """
     team = _get_team(team_id)
     if not team:
+        log.error(
+            "[TICKETING] provision_all_access — team_id='%s' not found in teams.json",
+            team_id
+        )
         return {
             "success":  False,
             "message":  f"❌ Team '{team_id}' not found. Cannot provision access.",
@@ -201,6 +231,11 @@ def provision_all_access(
         }
 
     required_systems = team["required_systems"]
+    log.info(
+        "[TICKETING] provision_all_access — team='%s' developer='%s' "
+        "systems_count=%d systems=%s",
+        team_name, developer_name, len(required_systems), required_systems
+    )
     results          = []
     successes        = 0
     failures         = 0
@@ -225,6 +260,19 @@ def provision_all_access(
         if failures == 0
         else f"⚠️  {successes} tickets raised, {failures} failed — admin notified for failed items."
     )
+
+    if failures == 0:
+        log.info(
+            "[TICKETING] provision_all_access complete — team='%s' "
+            "raised=%d failed=%d",
+            team_name, successes, failures
+        )
+    else:
+        log.warning(
+            "[TICKETING] provision_all_access partial failure — team='%s' "
+            "raised=%d failed=%d",
+            team_name, successes, failures
+        )
 
     return {
         "success":          failures == 0,

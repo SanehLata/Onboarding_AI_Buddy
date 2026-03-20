@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from config import TEAMS_JSON, MAX_RETRIES, RETRY_DELAY_SECONDS
+from config import TEAMS_JSON, MAX_RETRIES, RETRY_DELAY_SECONDS, log
 
 
 # ── AD Group definitions ──────────────────────────────────────────────────────
@@ -124,6 +124,11 @@ def request_ad_group_access(
         error: str | None,
     }
     """
+    log.info(
+        "[ACCESS] request_ad_group_access — group='%s' developer='%s' "
+        "approval_required=%s",
+        group_name, developer_name, approval_required
+    )
     attempt    = 0
     last_error = None
 
@@ -142,6 +147,12 @@ def request_ad_group_access(
                 "pending manager approval"
                 if approval_required
                 else "provisioned automatically"
+            )
+
+            log.info(
+                "[ACCESS] AD group request submitted — group='%s' request_id='%s' "
+                "status='%s' attempts=%d",
+                group_name, result["request_id"], result["status"], attempt
             )
 
             return {
@@ -165,9 +176,18 @@ def request_ad_group_access(
 
         except Exception as exc:
             last_error = str(exc)
+            log.warning(
+                "[ACCESS] attempt %d/%d failed — group='%s' error='%s'",
+                attempt, MAX_RETRIES, group_name, last_error
+            )
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS)
 
+    log.error(
+        "[ACCESS] request_ad_group_access FAILED — group='%s' developer='%s' "
+        "after %d attempts last_error='%s'",
+        group_name, developer_name, MAX_RETRIES, last_error
+    )
     return {
         "success":             False,
         "request_id":          None,
@@ -198,12 +218,20 @@ def provision_all_ad_groups(
     """
     groups = AD_GROUP_MAP.get(team_id)
     if not groups:
+        log.error(
+            "[ACCESS] provision_all_ad_groups — no AD groups defined for team_id='%s'",
+            team_id
+        )
         return {
             "success":  False,
             "message":  f"❌ No AD groups defined for team '{team_id}'.",
             "results":  [],
         }
 
+    log.info(
+        "[ACCESS] provision_all_ad_groups — team='%s' developer='%s' group_count=%d",
+        team_name, developer_name, len(groups)
+    )
     results   = []
     successes = 0
     failures  = 0
@@ -233,12 +261,22 @@ def provision_all_ad_groups(
             f"   Auto-provisioned : {auto_provisioned}\n"
             f"   Pending approval : {pending_approval}"
         )
+        log.info(
+            "[ACCESS] provision_all_ad_groups complete — team='%s' submitted=%d "
+            "auto_provisioned=%d pending_approval=%d",
+            team_name, successes, auto_provisioned, pending_approval
+        )
     else:
         status_line = (
             f"⚠️  {successes}/{len(groups)} AD group requests submitted, {failures} failed.\n"
             f"   Auto-provisioned : {auto_provisioned}\n"
             f"   Pending approval : {pending_approval}\n"
             f"   Admin notified for failures."
+        )
+        log.warning(
+            "[ACCESS] provision_all_ad_groups partial failure — team='%s' "
+            "submitted=%d failed=%d",
+            team_name, successes, failures
         )
 
     return {

@@ -11,7 +11,7 @@ from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from config import (
-    GROQ_API_KEY, LLM_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS, TEAMS_JSON
+    GROQ_API_KEY, LLM_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS, TEAMS_JSON, log
 )
 from memory.profile_store import (
     save_profile, get_profile, get_profile_by_email,
@@ -26,6 +26,7 @@ from tools.access import provision_all_ad_groups
 # ── LLM ──────────────────────────────────────────────────────────────────────
 
 def _get_llm() -> ChatGroq:
+    log.debug("Initializing LLM | model=%s | temp=%s", LLM_MODEL, LLM_TEMPERATURE)
     return ChatGroq(
         api_key=GROQ_API_KEY,
         model=LLM_MODEL,
@@ -37,19 +38,24 @@ def _get_llm() -> ChatGroq:
 # ── Team data helpers ─────────────────────────────────────────────────────────
 
 def _load_teams() -> list[dict]:
+    log.debug("Loading teams from JSON")
     return json.loads(TEAMS_JSON.read_text(encoding="utf-8"))["teams"]
 
 
 def _get_team_by_name(name: str) -> dict | None:
+    log.debug("Looking up team by name: %s", name)
     teams = _load_teams()
     name_lower = name.lower().strip()
     for t in teams:
         if name_lower in t["team_name"].lower() or name_lower in t["team_id"].lower():
+            log.info("Found team: %s", t["team_name"])
             return t
+    log.warning("Team not found: %s", name)
     return None
 
 
 def _team_names_list() -> str:
+    log.debug("Building team names list")
     return ", ".join(t["team_name"] for t in _load_teams())
 
 
@@ -80,6 +86,7 @@ Conversation so far:
 
 def extract_profile_from_conversation(messages: list) -> dict:
     """Use the LLM to extract structured profile fields from conversation history."""
+    log.info("Extracting profile from %d messages", len(messages))
     llm = _get_llm()
     conversation_text = "\n".join(
         f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}"
@@ -94,6 +101,7 @@ def extract_profile_from_conversation(messages: list) -> dict:
 
     response = llm.invoke([SystemMessage(content=prompt)])
     raw = response.content.strip()
+    log.debug("Raw profile extraction response: %s", raw)
 
     # Strip markdown code fences if LLM wraps in ```json
     if raw.startswith("```"):
@@ -103,8 +111,10 @@ def extract_profile_from_conversation(messages: list) -> dict:
         raw = raw.strip()
 
     try:
+        log.info("Profile Extraction Successful: %s", raw)
         return json.loads(raw)
     except json.JSONDecodeError:
+        log.error("Profile extraction failed: %s", raw)
         return {"profile_complete": False}
 
 
@@ -148,6 +158,7 @@ def get_profiler_response(
     Returns:
         (response_text, profile_complete_signal)
     """
+    log.info("Generating profiler response | user_input=%s", user_message)
     llm = _get_llm()
 
     profile_status = (
@@ -171,10 +182,13 @@ def get_profiler_response(
     response = llm.invoke(messages)
     text = response.content.strip()
 
+    log.debug("LLM profiler response: %s", text)
+
     profile_complete = "PROFILE_READY" in text
     # Clean the signal from the visible output
     clean_text = text.replace("PROFILE_READY", "").strip()
 
+    log.info("Profile complete signal detected: %s", profile_complete)
     return clean_text, profile_complete
 
 
@@ -210,8 +224,10 @@ def check_returning_user(user_message: str) -> dict | None:
 
     Returns the full profile dict if found, None if not found.
     """
+    log.info("Checking if user is a returning user | user_input=%s", user_message)
     profiles = list_all_profiles()
     if not profiles:
+        log.warning("No profiles found in DB")
         return None
 
     # Simple name matching — check if any known name appears in the message
@@ -223,8 +239,10 @@ def check_returning_user(user_message: str) -> dict | None:
 
         # Match on full name or first name appearing in the message
         if full_lower and full_lower in msg_lower:
+            log.info("Found returning user profile: %s", profile)
             return profile
         if first_name and len(first_name) > 2 and first_name in msg_lower:
+            log.info("Found returning user profile: %s", profile)
             return profile
 
     return None
@@ -242,6 +260,7 @@ def build_returning_user_greeting(profile: dict) -> str:
         start_date       = profile.get("start_date", ""),
     )
     response = llm.invoke([SystemMessage(content=system)])
+    log.info("Returning user greeting: %s", response.content.strip())
     return response.content.strip()
 
 
@@ -259,6 +278,7 @@ def run_provisioning(state: dict) -> dict:
     Returns updated state.
     """
     profile    = state["profile"]
+    log.info("Starting provisioning | name=%s | email=%s", profile["name"], profile["email"])
     dev_id     = profile["id"]
     session_id = state.get("session_id")   # int or None — assigned after profile saved
 
@@ -272,6 +292,10 @@ def run_provisioning(state: dict) -> dict:
         team_name=profile["team_name"],
         manager_name=profile["manager_name"],
     )
+
+    log.info("Ticket provisioning success=%s", ticket_result["success"])
+    log.debug("Ticket result: %s", ticket_result)
+
     provisioning_results["tickets"] = ticket_result
 
     # Persist each raised ticket to DB
@@ -299,6 +323,10 @@ def run_provisioning(state: dict) -> dict:
         developer_email=profile["email"],
         start_date=profile.get("start_date", ""),
     )
+
+    log.info("DL email provisioning success=%s", email_result["success"])
+    log.debug("DL email result: %s", email_result)
+
     provisioning_results["dl_emails"] = email_result
 
     # Persist each DL subscription
@@ -324,6 +352,10 @@ def run_provisioning(state: dict) -> dict:
         team_name=profile["team_name"],
         manager_email=profile["manager_email"],
     )
+
+    log.info("AD group provisioning success=%s", ad_result["success"])
+    log.debug("AD group result: %s", ad_result)
+
     provisioning_results["ad_groups"] = ad_result
 
     log_agent_action(dev_id, "AD_GROUPS_REQUESTED", ad_result, session_id=session_id,
@@ -337,6 +369,9 @@ def run_provisioning(state: dict) -> dict:
         manager_name=profile["manager_name"],
         start_date=profile.get("start_date", ""),
     )
+
+    log.info("Welcome email sent=%s", welcome_result["success"])
+
     provisioning_results["welcome_email"] = welcome_result
 
     log_agent_action(dev_id, "WELCOME_EMAIL_SENT", welcome_result, session_id=session_id,
@@ -379,4 +414,6 @@ def build_provisioning_summary(results: dict, developer_name: str) -> str:
         "Ask me anything about your team, systems, architecture, or processes — I'm here to help! 🚀",
     ]
 
-    return "\n".join(lines)
+    summary = "\n".join(lines)
+    log.info("Provisioning summary: %s", summary)
+    return summary

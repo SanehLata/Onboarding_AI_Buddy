@@ -18,6 +18,7 @@ from config import (
 )
 from memory.progress import get_progress_summary, get_covered_topics, get_next_unread_doc, get_hitl_candidate
 from memory.profile_store import get_profile, log_agent_action
+from config import log
 
 
 # ── Routing decisions ─────────────────────────────────────────────────────────
@@ -64,11 +65,14 @@ Message: "{message}"
 
 def classify_intent(message: str) -> str:
     """Classify a user message into a high-level intent category."""
+    log.info("[CLASSIFY_INTENT] classifying message='%s'", message[:60])
     llm = _get_llm()
     response = llm.invoke([
         SystemMessage(content=_INTENT_PROMPT.format(message=message))
     ])
-    return response.content.strip().upper()
+    intent = response.content.strip().upper()
+    log.info("[CLASSIFY_INTENT] → intent=%s", intent)
+    return intent
 
 
 # ── Core routing logic ────────────────────────────────────────────────────────
@@ -93,18 +97,22 @@ def decide_route(state: dict, user_message: str) -> Route:
 
     # ── 1. Escalate if too many errors ────────────────────────────────────────
     if error_count >= 3:
+        log.warning("[DECIDE_ROUTE] error_count=%d >= 3 → ESCALATE", error_count)
         return Route.ESCALATE
 
     # ── 2. Profile incomplete ─────────────────────────────────────────────────
     if not profile_complete:
+        log.info("[DECIDE_ROUTE] profile_complete=False → PROFILE")
         return Route.PROFILE
 
     # ── 3. Provisioning not yet run ───────────────────────────────────────────
     if profile_complete and not provisioning_complete:
+        log.info("[DECIDE_ROUTE] provisioning_complete=False → PROVISION")
         return Route.PROVISION
 
     # ── 4. Learning path not yet generated ────────────────────────────────────
     if provisioning_complete and not path_generated:
+        log.info("[DECIDE_ROUTE] path_generated=False → GENERATE_PATH")
         return Route.GENERATE_PATH
 
     # ── 5. Developer asking about their progress ──────────────────────────────
@@ -112,6 +120,7 @@ def decide_route(state: dict, user_message: str) -> Route:
     progress_keywords = ["progress", "what have i read", "what's next", "how am i doing",
                          "learning path", "next step", "what should i read"]
     if any(kw in lower for kw in progress_keywords):
+        log.info("[DECIDE_ROUTE] progress keyword matched → SHOW_PROGRESS")
         return Route.SHOW_PROGRESS
 
     # ── 6. HITL — check if a doc is ready for completion confirmation ─────────
@@ -119,6 +128,7 @@ def decide_route(state: dict, user_message: str) -> Route:
     if dev_id:
         # If we're waiting for a Yes/No response to a HITL prompt, handle it first
         if state.get("hitl_pending"):
+            log.info("[DECIDE_ROUTE] hitl_pending=True → HITL_RESPONSE")
             return Route.HITL_RESPONSE
 
         # Check if any doc qualifies for HITL interrupt
@@ -128,7 +138,15 @@ def decide_route(state: dict, user_message: str) -> Route:
             # Only interrupt if message is not a real question (don't break their flow)
             intent = classify_intent(user_message)
             if intent in ("SMALL_TALK", "OTHER", "PROGRESS_CHECK"):
+                log.info(
+                    "[DECIDE_ROUTE] HITL candidate='%s' intent=%s → HITL_CONFIRM",
+                    candidate.get("doc_title"), intent
+                )
                 return Route.HITL_CONFIRM
+            log.info(
+                "[DECIDE_ROUTE] HITL candidate found but intent=%s — "
+                "not interrupting real question", intent
+            )
 
     # ── 7. Proactive nudge logic ──────────────────────────────────────────────
     if dev_id:
@@ -136,9 +154,14 @@ def decide_route(state: dict, user_message: str) -> Route:
         if summary["should_nudge"] and summary["not_started"] > 0:
             intent = classify_intent(user_message) if "intent" not in dir() else intent
             if intent in ("SMALL_TALK", "OTHER"):
+                log.info(
+                    "[DECIDE_ROUTE] nudge due total_questions=%d intent=%s → PROACTIVE_NUDGE",
+                    summary["total_questions"], intent
+                )
                 return Route.PROACTIVE_NUDGE
 
     # ── 8. Default: answer the question ──────────────────────────────────────
+    log.info("[DECIDE_ROUTE] default → ANSWER_QUESTION")
     return Route.ANSWER_QUESTION
 
 
@@ -148,6 +171,7 @@ def build_proactive_nudge_response(developer_id: str, developer_name: str) -> st
     """Build a proactive suggestion message for the next unread document."""
     next_doc = get_next_unread_doc(developer_id)
     if not next_doc:
+        log.info("[NUDGE] dev_id=%s — all docs completed, no nudge to send", developer_id)
         return (
             "You're making great progress! You've covered all the documents in your learning path. "
             "Feel free to ask me anything about the systems or processes at any time."
@@ -163,6 +187,10 @@ def build_proactive_nudge_response(developer_id: str, developer_name: str) -> st
     }
     context = category_context.get(next_doc["category"], "")
 
+    log.info(
+        "[NUDGE] dev_id=%s topics_covered=%d next_doc='%s' category=%s",
+        developer_id, count, next_doc.get("doc_title"), next_doc.get("category")
+    )
     return (
         f"Great chatting with you! You've explored {count} topic{'s' if count != 1 else ''} so far. 🎯\n\n"
         f"When you're ready, your next recommended read is:\n\n"
@@ -178,6 +206,12 @@ def build_progress_response(developer_id: str, developer_name: str) -> str:
     covered    = get_covered_topics(developer_id)
     next_doc   = get_next_unread_doc(developer_id)
     first_name = developer_name.split()[0] if developer_name else "there"
+    log.info(
+        "[PROGRESS] dev_id=%s completion=%d%% completed=%d in_progress=%d "
+        "not_started=%d total_questions=%d",
+        developer_id, summary["completion_pct"], summary["completed"],
+        summary["in_progress"], summary["not_started"], summary["total_questions"]
+    )
 
     lines = [
         f"Here's your onboarding progress, {first_name}! 📊\n",
@@ -278,6 +312,7 @@ def classify_hitl_response(message: str) -> str:
     Returns: 'YES' | 'NO' | 'UNCLEAR'
     """
     lower = message.lower().strip()
+    log.info("[HITL_CLASSIFY] classifying response message='%s'", message[:60])
 
     yes_words = {"yes", "yeah", "yep", "sure", "ok", "okay", "done",
                  "complete", "finished", "mark it", "go ahead", "do it", "correct"}
@@ -285,11 +320,14 @@ def classify_hitl_response(message: str) -> str:
                  "leave it", "still reading", "skip", "later"}
 
     if any(w in lower for w in yes_words):
+        log.info("[HITL_CLASSIFY] keyword match → YES")
         return "YES"
     if any(w in lower for w in no_words):
+        log.info("[HITL_CLASSIFY] keyword match → NO")
         return "NO"
 
     # Ambiguous — use LLM
+    log.info("[HITL_CLASSIFY] ambiguous response — calling LLM for classification")
     llm = _get_llm()
     prompt = (
         f'The developer was asked: "Would you like me to mark this document as complete?"\n'
@@ -297,4 +335,6 @@ def classify_hitl_response(message: str) -> str:
         f'Reply with only YES, NO, or UNCLEAR.'
     )
     result = llm.invoke([SystemMessage(content=prompt)])
-    return result.content.strip().upper()
+    classification = result.content.strip().upper()
+    log.info("[HITL_CLASSIFY] LLM classified → %s", classification)
+    return classification

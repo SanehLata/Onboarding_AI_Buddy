@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from config import DL_GROUPS_JSON, MAX_RETRIES, RETRY_DELAY_SECONDS
+from config import DL_GROUPS_JSON, MAX_RETRIES, RETRY_DELAY_SECONDS, log
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -125,6 +125,12 @@ def send_dl_subscription_email(
         start_date=start_date,
     )
 
+    log.info(
+        "[EMAIL] send_dl_subscription_email — dl='%s' owner='%s' (%s) "
+        "developer='%s'",
+        dl["dl_name"], dl["owner_name"], dl["owner_email"], developer_name
+    )
+
     while attempt < MAX_RETRIES:
         attempt += 1
         try:
@@ -133,6 +139,11 @@ def send_dl_subscription_email(
                 to_name=dl["owner_name"],
                 subject=rendered["subject"],
                 body=rendered["body"],
+            )
+
+            log.info(
+                "[EMAIL] sent — dl='%s' message_id='%s' attempts=%d",
+                dl["dl_name"], receipt["message_id"], attempt
             )
 
             return {
@@ -156,9 +167,18 @@ def send_dl_subscription_email(
 
         except Exception as exc:
             last_error = str(exc)
+            log.warning(
+                "[EMAIL] attempt %d/%d failed — dl='%s' error='%s'",
+                attempt, MAX_RETRIES, dl["dl_name"], last_error
+            )
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS)
 
+    log.error(
+        "[EMAIL] send_dl_subscription_email FAILED — dl='%s' owner='%s' "
+        "after %d attempts last_error='%s'",
+        dl["dl_name"], dl["owner_email"], MAX_RETRIES, last_error
+    )
     return {
         "success":     False,
         "dl_id":       dl["dl_id"],
@@ -190,12 +210,19 @@ def send_all_dl_emails(
     dls = _get_team_dls(team_id)
 
     if not dls:
+        log.error(
+            "[EMAIL] send_all_dl_emails — no DLs found for team_id='%s'", team_id
+        )
         return {
             "success":   False,
             "message":   f"❌ No distribution lists found for team '{team_id}'.",
             "results":   [],
         }
 
+    log.info(
+        "[EMAIL] send_all_dl_emails — team_id='%s' developer='%s' dl_count=%d",
+        team_id, developer_name, len(dls)
+    )
     results   = []
     successes = 0
     failures  = 0
@@ -218,6 +245,17 @@ def send_all_dl_emails(
         if failures == 0
         else f"⚠️  {successes} emails sent, {failures} failed — admin notified."
     )
+
+    if failures == 0:
+        log.info(
+            "[EMAIL] send_all_dl_emails complete — team_id='%s' sent=%d failed=%d",
+            team_id, successes, failures
+        )
+    else:
+        log.warning(
+            "[EMAIL] send_all_dl_emails partial failure — team_id='%s' sent=%d failed=%d",
+            team_id, successes, failures
+        )
 
     return {
         "success":         failures == 0,
@@ -264,6 +302,10 @@ Best of luck,
 Onboarding Buddy — TechCorp Engineering
 """
 
+    log.info(
+        "[EMAIL] send_welcome_email — developer='%s' email='%s' team='%s'",
+        developer_name, developer_email, team_name
+    )
     attempt    = 0
     last_error = None
 
@@ -276,6 +318,10 @@ Onboarding Buddy — TechCorp Engineering
                 subject=subject,
                 body=body,
             )
+            log.info(
+                "[EMAIL] welcome email sent — developer='%s' message_id='%s' attempts=%d",
+                developer_name, receipt["message_id"], attempt
+            )
             return {
                 "success":    True,
                 "message_id": receipt["message_id"],
@@ -285,9 +331,18 @@ Onboarding Buddy — TechCorp Engineering
             }
         except Exception as exc:
             last_error = str(exc)
+            log.warning(
+                "[EMAIL] welcome email attempt %d/%d failed — developer='%s' error='%s'",
+                attempt, MAX_RETRIES, developer_name, last_error
+            )
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS)
 
+    log.error(
+        "[EMAIL] send_welcome_email FAILED — developer='%s' email='%s' "
+        "after %d attempts last_error='%s'",
+        developer_name, developer_email, MAX_RETRIES, last_error
+    )
     return {
         "success":    False,
         "message_id": None,

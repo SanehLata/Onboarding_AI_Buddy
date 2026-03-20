@@ -23,6 +23,7 @@ from memory.progress import (
     record_progress, get_progress_summary, mark_doc_started,
 )
 from memory.profile_store import log_agent_action
+from config import log
 
 
 # ── Lazy singletons ───────────────────────────────────────────────────────────
@@ -34,8 +35,11 @@ _vector_store = None
 def _get_llm() -> ChatGroq:
     global _llm
     if _llm is None:
+        log.info("[LLM] initialising ChatGroq — model=%s temperature=%s", LLM_MODEL, LLM_TEMPERATURE)
+        if not GROQ_API_KEY:
+            log.warning("[LLM] GROQ_API_KEY is not set — LLM calls will fail")
         _llm = ChatGroq(
-                model=LLM_MODEL,
+            model=LLM_MODEL,
             temperature=LLM_TEMPERATURE,
             max_tokens=LLM_MAX_TOKENS,
         )
@@ -45,6 +49,10 @@ def _get_llm() -> ChatGroq:
 def _get_vector_store() -> Chroma:
     global _vector_store
     if _vector_store is None:
+        log.info(
+            "[VECTOR_STORE] initialising — model=%s collection=%s dir=%s",
+            EMBEDDING_MODEL, COLLECTION_NAME, VECTORSTORE_DIR
+        )
         embeddings = HuggingFaceEmbeddings(
             model_name=EMBEDDING_MODEL,
             model_kwargs={"device": "cpu"},
@@ -55,6 +63,7 @@ def _get_vector_store() -> Chroma:
             embedding_function=embeddings,
             persist_directory=str(VECTORSTORE_DIR),
         )
+        log.info("[VECTOR_STORE] initialised successfully")
     return _vector_store
 
 
@@ -141,11 +150,20 @@ def generate_learning_path(profile: dict, session_id: str = None) -> list[dict]:
     Generate a personalised learning path for a developer using the LLM.
     Stores the path in SQLite and returns it.
     """
+    log.info(
+        "[GENERATE_PATH] entry — dev_id=%s name='%s' team='%s' level='%s'",
+        profile.get("id"), profile.get("name"),
+        profile.get("team_name"), profile.get("experience_level")
+    )
     llm   = _get_llm()
     team  = _get_team(profile.get("team_id", ""))
 
     required_skills = team["required_skills"] if team else []
     skill_gaps      = _skill_gap(profile.get("skills", []), required_skills)
+    log.info(
+        "[GENERATE_PATH] skill analysis — required=%d gaps=%d gap_list=%s",
+        len(required_skills), len(skill_gaps), skill_gaps
+    )
 
     available_docs_text = "\n".join(
         f"  {path} | {title} | {cat}"
@@ -163,6 +181,7 @@ def generate_learning_path(profile: dict, session_id: str = None) -> list[dict]:
         available_docs=available_docs_text,
     )
 
+    log.info("[GENERATE_PATH] calling LLM for path generation — model=%s", LLM_MODEL)
     response = _get_llm().invoke([SystemMessage(content=prompt)])
     raw = response.content.strip()
 
@@ -174,12 +193,17 @@ def generate_learning_path(profile: dict, session_id: str = None) -> list[dict]:
 
     try:
         path_docs = json.loads(raw)
+        log.info("[GENERATE_PATH] LLM returned %d documents", len(path_docs))
     except json.JSONDecodeError:
-        # Fallback — return a safe default path if LLM response is malformed
+        log.warning(
+            "[GENERATE_PATH] LLM response was not valid JSON — using default path. "
+            "raw_preview='%s'", raw[:120]
+        )
         path_docs = _default_learning_path(profile)
 
     # Persist to DB
     save_learning_path(profile["id"], path_docs)
+    log.info("[GENERATE_PATH] learning path persisted — dev_id=%s doc_count=%d", profile["id"], len(path_docs))
 
     if session_id:
         log_agent_action(
@@ -257,12 +281,17 @@ def answer_question(
         proactive_nudge: str | None,
     }
     """
+    log.info(
+        "[ANSWER_QUESTION] query='%s' dev_id=%s session_id=%s",
+        query[:70], profile.get("id"), session_id
+    )
     vs = _get_vector_store()
 
     # Retrieve relevant chunks
     docs = vs.similarity_search(query, k=RETRIEVER_TOP_K)
 
     if not docs:
+        log.warning("[ANSWER_QUESTION] no chunks retrieved from vector store — query='%s'", query[:70])
         return {
             "answer": (
                 "I couldn't find anything in the knowledge base for that question. "
@@ -297,6 +326,10 @@ def answer_question(
         )
     )
 
+    log.info(
+        "[ANSWER_QUESTION] retrieved %d chunks — top_source='%s' calling LLM",
+        len(docs), docs[0].metadata.get("source", "unknown") if docs else "none"
+    )
     response = _get_llm().invoke([system, HumanMessage(content=query)])
     answer   = response.content.strip()
 
@@ -319,6 +352,17 @@ def answer_question(
     if not source_doc and docs:
         source_doc = docs[0].metadata.get("source")
 
+    log.info(
+        "[ANSWER_QUESTION] answer extracted — topic='%s' source_doc='%s' "
+        "answer_len=%d retrieved_chunks=%d",
+        topic, source_doc, len(clean_answer), len(docs)
+    )
+    if not topic:
+        log.warning(
+            "[ANSWER_QUESTION] no TOPIC signal in LLM response — "
+            "progress will NOT be recorded for query='%s'", query[:70]
+        )
+
     # Record progress
     if topic:
         record_progress(
@@ -339,6 +383,10 @@ def answer_question(
     if summary["should_nudge"]:
         next_doc = get_next_unread_doc(profile["id"])
         if next_doc:
+            log.info(
+                "[ANSWER_QUESTION] proactive nudge appended — next_doc='%s'",
+                next_doc.get("doc_title")
+            )
             nudge = (
                 f"\n\n💡 **Next suggested read:** [{next_doc['doc_title']}]"
                 f"\n   _{next_doc.get('reason', 'Part of your learning path')}_"

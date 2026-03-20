@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from config import DB_PATH, PROACTIVE_NUDGE_AFTER
+from config import DB_PATH, PROACTIVE_NUDGE_AFTER, log
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -42,11 +42,17 @@ def start_session(developer_id: int) -> int:
             """,
             (developer_id, _now()),
         )
-        return cursor.lastrowid
+        session_id = cursor.lastrowid
+    log.info(
+        "[PROGRESS] session started — dev_id=%s session_id=%s",
+        developer_id, session_id
+    )
+    return session_id
 
 
 def end_session(session_id: int) -> None:
     """Mark a session as ended."""
+    log.info("[PROGRESS] session ended — session_id=%s", session_id)
     with _connect() as conn:
         conn.execute(
             "UPDATE sessions SET ended_at = ? WHERE id = ?",
@@ -131,6 +137,11 @@ def record_progress(
                 _now(),
             ),
         )
+    log.info(
+        "[PROGRESS] record_progress — dev_id=%s session_id=%s "
+        "topic='%s' source_doc='%s'",
+        developer_id, session_id, topic, source_doc
+    )
 
     # Keep session topics list in sync
     add_topic_to_session(session_id, topic)
@@ -207,6 +218,10 @@ def save_learning_path(developer_id: int, docs: list[dict]) -> None:
             "DELETE FROM learning_path WHERE developer_id = ?",
             (developer_id,),
         )
+        log.info(
+            "[PROGRESS] save_learning_path — cleared existing path for dev_id=%s",
+            developer_id
+        )
 
         records = [
             {
@@ -236,6 +251,10 @@ def save_learning_path(developer_id: int, docs: list[dict]) -> None:
             """,
             records,
         )
+    log.info(
+        "[PROGRESS] save_learning_path — inserted %d docs for dev_id=%s",
+        len(records), developer_id
+    )
 
 
 def get_learning_path(developer_id: int) -> list[dict]:
@@ -254,6 +273,10 @@ def get_learning_path(developer_id: int) -> list[dict]:
 
 def mark_doc_started(developer_id: int, doc_path: str) -> None:
     """Mark a document as in_progress if it was not_started."""
+    log.info(
+        "[PROGRESS] mark_doc_started — dev_id=%s doc_path='%s'",
+        developer_id, doc_path
+    )
     with _connect() as conn:
         conn.execute(
             """
@@ -267,6 +290,10 @@ def mark_doc_started(developer_id: int, doc_path: str) -> None:
 
 def mark_doc_completed(developer_id: int, doc_path: str) -> None:
     """Mark a document as completed."""
+    log.info(
+        "[PROGRESS] mark_doc_completed — dev_id=%s doc_path='%s'",
+        developer_id, doc_path
+    )
     with _connect() as conn:
         conn.execute(
             """
@@ -295,6 +322,12 @@ def record_doc_read(
     Uses a [READ] prefix on the query field to distinguish document reads
     from questions asked — useful for analytics and LLM history filtering.
     """
+    log.info(
+        "[PROGRESS] record_doc_read — dev_id=%s session_id=%s "
+        "doc_path='%s' doc_title='%s'",
+        developer_id, session_id, doc_path, doc_title
+    )
+
     # 1. Mark the document as completed in learning_path
     mark_doc_completed(developer_id, doc_path)
 
@@ -322,6 +355,10 @@ def record_doc_read(
     #    so should_nudge (total_questions % PROACTIVE_NUDGE_AFTER == 0) fires correctly
     add_topic_to_session(session_id, doc_title)
     increment_session_messages(session_id)
+    log.info(
+        "[PROGRESS] record_doc_read complete — learning_path updated, "
+        "progress_tracking inserted, message_count incremented"
+    )
 
 
 def get_next_unread_doc(developer_id: int) -> Optional[dict]:
@@ -412,10 +449,25 @@ def get_hitl_candidate(
             count_at_decline  = hitl_declined[doc_path]
             questions_since   = question_count - count_at_decline
             if questions_since < HITL_SNOOZE_AFTER:
+                log.info(
+                    "[PROGRESS] get_hitl_candidate — doc='%s' snoozed "
+                    "questions_since_decline=%d/%d",
+                    doc_path, questions_since, HITL_SNOOZE_AFTER
+                )
                 continue        # still in snooze window — skip
 
+        log.info(
+            "[PROGRESS] get_hitl_candidate — candidate found doc='%s' "
+            "question_count=%d threshold=%d",
+            doc_path, question_count, HITL_QUESTIONS_PER_DOC
+        )
         return dict(row)
 
+    log.info(
+        "[PROGRESS] get_hitl_candidate — no candidate found for dev_id=%s "
+        "(unfinished_docs=%d)",
+        developer_id, len(unfinished)
+    )
     return None
 
 
@@ -448,6 +500,14 @@ def get_progress_summary(developer_id: int) -> dict:
     stats      = {r["status"]: r["count"] for r in path_stats}
     total_docs = sum(stats.values())
 
+    should_nudge = total_questions > 0 and total_questions % PROACTIVE_NUDGE_AFTER == 0
+    if should_nudge:
+        log.info(
+            "[PROGRESS] get_progress_summary — nudge due dev_id=%s "
+            "total_questions=%d (%%  %d == 0)",
+            developer_id, total_questions, PROACTIVE_NUDGE_AFTER
+        )
+
     return {
         "total_docs":      total_docs,
         "completed":       stats.get("completed", 0),
@@ -456,5 +516,5 @@ def get_progress_summary(developer_id: int) -> dict:
         "completion_pct":  round(stats.get("completed", 0) / max(total_docs, 1) * 100),
         "total_questions": total_questions,
         "total_sessions":  total_sessions,
-        "should_nudge":    total_questions > 0 and total_questions % PROACTIVE_NUDGE_AFTER == 0,
+        "should_nudge":    should_nudge,
     }

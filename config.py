@@ -93,25 +93,28 @@ os.environ.setdefault(
 #   WARNING — unexpected but recoverable (missing fields, fallbacks triggered)
 #   ERROR   — failures that affect the user (tool errors, DB failures)
 
+BASE_DIR = Path(__file__).parent
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
+# Enhanced formatter with filename, function name, and line number
 _formatter = logging.Formatter(
-    fmt   = "%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
-    datefmt = "%Y-%m-%d %H:%M:%S",
+    fmt="%(asctime)s  %(levelname)-8s  %(name)s  [%(filename)s:%(funcName)s:%(lineno)d]  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-_file_handler    = logging.FileHandler(LOG_DIR / "onboarding_buddy.log", encoding="utf-8")
+_file_handler = logging.FileHandler(LOG_DIR / "onboarding_buddy.log", encoding="utf-8")
 _console_handler = logging.StreamHandler()
 
 _file_handler.setFormatter(_formatter)
 _console_handler.setFormatter(_formatter)
 
 # Root logger for the project — all submodule loggers inherit from this
-logging.getLogger("onboarding_buddy").setLevel(logging.INFO)
-logging.getLogger("onboarding_buddy").addHandler(_file_handler)
-logging.getLogger("onboarding_buddy").addHandler(_console_handler)
-logging.getLogger("onboarding_buddy").propagate = False
+_logger = logging.getLogger("onboarding_buddy")
+_logger.setLevel(logging.INFO)
+_logger.addHandler(_file_handler)
+_logger.addHandler(_console_handler)
+_logger.propagate = False
 
 # Silence noisy third-party loggers that aren't useful day-to-day
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -120,4 +123,11 @@ logging.getLogger("chromadb").setLevel(logging.WARNING)
 logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 
 # Single logger instance imported by all modules
-log = logging.getLogger("onboarding_buddy")
+log = _logger
+
+# Example usage
+def example_function():
+    log.info("This is a test log message")
+
+if __name__ == "__main__":
+    example_function()
