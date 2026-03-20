@@ -1,13 +1,1 @@
-### Step 2: Add to ExternalSecret Kubernetes resource
-Edit the `ExternalSecret` manifest in the service's Helm chart:
-```yaml
-spec:
-  data:
-    - secretKey: new-api-key      # Key name in Kubernetes Secret
-      remoteRef:
-        key: production/payments-service/new-api-key
-        property: api_key
-```
-
-### Step 3: Reference in your code
-Use the environment variable or fetch via boto3 as shown a
+invalid type: string "## Auditing Secret Access\n\nAll secret access is logged in CloudTrail. To check who accessed a secret:\n\n```bash\naws cloudtrail lookup-events \\\n  --lookup-attributes AttributeKey=ResourceName,AttributeValue=production/payments-service/stripe-api-key \\\n  --start-time 2025-01-01 \\\n  --end-time 2025-01-15\n```\n\n---", expected a booleanur code\nta-clienÿ7Lÿÿÿÿÿÿÿÿÿÿÿÿ

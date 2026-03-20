@@ -150,13 +150,24 @@ def decide_route(state: dict, user_message: str) -> Route:
 
     # ── 7. Proactive nudge logic ──────────────────────────────────────────────
     if dev_id:
-        summary = get_progress_summary(dev_id)
-        if summary["should_nudge"] and summary["not_started"] > 0:
+        summary          = get_progress_summary(dev_id)
+        last_nudge_count = state.get("last_nudge_count", 0)
+
+        # Guard: only nudge when total_questions has advanced past the last nudge.
+        # Without this, should_nudge stays True after firing (count unchanged) and
+        # every subsequent message or sidebar rerender re-triggers the nudge.
+        nudge_ready = (
+            summary["should_nudge"]
+            and summary["total_questions"] != last_nudge_count
+            and summary["not_started"] > 0
+        )
+        if nudge_ready:
             intent = classify_intent(user_message) if "intent" not in dir() else intent
             if intent in ("SMALL_TALK", "OTHER"):
                 log.info(
-                    "[DECIDE_ROUTE] nudge due total_questions=%d intent=%s → PROACTIVE_NUDGE",
-                    summary["total_questions"], intent
+                    "[DECIDE_ROUTE] nudge due total_questions=%d last_nudge_count=%d "
+                    "intent=%s → PROACTIVE_NUDGE",
+                    summary["total_questions"], last_nudge_count, intent
                 )
                 return Route.PROACTIVE_NUDGE
 

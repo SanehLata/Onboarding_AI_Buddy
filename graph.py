@@ -83,6 +83,9 @@ class OnboardingState(TypedDict):
     current_route:        str
     error_count:          int
 
+    # Nudge state
+    last_nudge_count:     int           # total_questions when nudge last fired — prevents re-firing
+
     # HITL state — Human-in-the-Loop doc completion confirmation
     hitl_pending:         bool          # True when waiting for Yes/No from developer
     hitl_doc:             Optional[dict]# The doc awaiting confirmation
@@ -417,18 +420,32 @@ def progress_node(state: OnboardingState) -> OnboardingState:
 def nudge_node(state: OnboardingState) -> OnboardingState:
     """Proactively suggest the next unread document."""
     profile  = state["profile"]
-    log.info(f"[NUDGE_NODE] proactive nudge triggered — dev_id={profile.get('id')}")
+    dev_id   = profile.get("id")
+    log.info(f"[NUDGE_NODE] proactive nudge triggered — dev_id={dev_id}")
     response = build_proactive_nudge_response(
-        developer_id=profile["id"],
+        developer_id=dev_id,
         developer_name=profile.get("name", ""),
     )
+
+    # Record the question count at which this nudge fired.
+    # decide_route in orchestrator.py checks this to prevent re-firing
+    # on the same count (without this, should_nudge stays True and every
+    # subsequent render or message re-triggers the nudge).
+    summary     = get_progress_summary(dev_id)
+    nudge_count = summary["total_questions"]
+    log.info(f"[NUDGE_NODE] recording last_nudge_count={nudge_count}")
 
     new_messages = [
         HumanMessage(content=state["user_message"]),
         AIMessage(content=response),
     ]
 
-    return {**state, "messages": new_messages, "response": response}
+    return {
+        **state,
+        "messages":         new_messages,
+        "response":         response,
+        "last_nudge_count": nudge_count,
+    }
 
 
 def escalate_node(state: OnboardingState) -> OnboardingState:
@@ -677,6 +694,7 @@ def create_initial_state(session_id: Optional[int] = None) -> OnboardingState:
         path_generated=False,
         current_route=Route.PROFILE.value,
         error_count=0,
+        last_nudge_count=0,
         hitl_pending=False,
         hitl_doc=None,
         hitl_declined={},
