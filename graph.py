@@ -254,7 +254,12 @@ def profile_node(state: OnboardingState) -> OnboardingState:
 
 def provision_node(state: OnboardingState) -> OnboardingState:
     """
-    Run all provisioning actions (tickets, emails, AD groups) for a complete profile.
+    Run all provisioning actions (tickets, emails, AD groups) for a complete profile,
+    then immediately generate the personalised learning path.
+
+    Both steps happen in a single node so the learning path tab is populated
+    as soon as the provisioning summary appears — the user never needs to ask
+    for it explicitly.
     """
     dev_id = state["profile"].get("id")
     log.info(
@@ -277,7 +282,31 @@ def provision_node(state: OnboardingState) -> OnboardingState:
         f"ad_groups={ad_result.get('requests_submitted', 0)}"
     )
 
-    summary       = build_provisioning_summary(
+    # ── Generate learning path immediately after provisioning ─────────────────
+    # This means the learning path tab populates without requiring
+    # the developer to send another message.
+    profile    = updated_state["profile"]
+    session_id = updated_state.get("session_id")
+
+    log.info(
+        f"[PROVISION_NODE] generating learning path inline — "
+        f"dev_id={dev_id} team='{profile.get('team_name')}'"
+    )
+    try:
+        path_docs = generate_learning_path(profile, session_id)
+        log.info(
+            f"[PROVISION_NODE] learning path generated — "
+            f"dev_id={dev_id} doc_count={len(path_docs)}"
+        )
+        path_generated = True
+    except Exception as e:
+        log.error(
+            f"[PROVISION_NODE] learning path generation failed — "
+            f"dev_id={dev_id} error='{e}'"
+        )
+        path_generated = False
+
+    summary = build_provisioning_summary(
         updated_state["provisioning_results"],
         state["profile"].get("name", ""),
     )
@@ -289,9 +318,10 @@ def provision_node(state: OnboardingState) -> OnboardingState:
 
     return {
         **updated_state,
-        "messages":             new_messages,
-        "response":             summary,
-        "provisioning_complete":True,
+        "messages":              new_messages,
+        "response":              summary,
+        "provisioning_complete": True,
+        "path_generated":        path_generated,
     }
 
 

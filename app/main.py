@@ -225,6 +225,37 @@ html, body, [class*="css"] {
     border-radius: 8px;
 }
 
+/* ── Doc reader expander — nested inside category expander ── */
+/* Force readable text colors on all markdown elements inside doc viewer */
+.doc-reader h1, .doc-reader h2, .doc-reader h3,
+.doc-reader h4, .doc-reader h5, .doc-reader h6 {
+    color: #e6edf3 !important;
+    margin-top: 1.2rem;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+}
+.doc-reader p, .doc-reader li, .doc-reader td, .doc-reader th {
+    color: #c9d1d9 !important;
+    line-height: 1.7;
+}
+.doc-reader a           { color: #58a6ff !important; }
+.doc-reader strong      { color: #e6edf3 !important; }
+.doc-reader code        { background: #21262d; color: #79c0ff;
+                          padding: 1px 5px; border-radius: 4px;
+                          font-family: 'DM Mono', monospace; font-size: 0.85em; }
+.doc-reader pre         { background: #161b22; border: 1px solid #30363d;
+                          border-radius: 6px; padding: 0.8rem 1rem; }
+.doc-reader pre code    { background: transparent; padding: 0; }
+.doc-reader blockquote  { border-left: 3px solid #30363d;
+                          padding-left: 1rem; color: #8b949e !important; }
+.doc-reader hr          { border-color: #21262d; margin: 1.2rem 0; }
+.doc-reader table       { border-collapse: collapse; width: 100%; }
+.doc-reader th          { background: #21262d; border: 1px solid #30363d;
+                          padding: 0.4rem 0.7rem; }
+.doc-reader td          { border: 1px solid #21262d; padding: 0.4rem 0.7rem; }
+.doc-reader ul, .doc-reader ol { padding-left: 1.4rem; }
+.doc-reader input[type="checkbox"] { accent-color: #238636; }
+
 /* ── Mark as read button ── */
 .stButton > button[kind="secondary"] {
     background: transparent;
@@ -570,6 +601,12 @@ def render_chat_tab() -> None:
                     _send_message(user_input)
                 st.markdown(st.session_state.chat_history[-1]["content"])
 
+        # Bug Fix: Rerun so the sidebar re-renders with the updated graph_state.
+        # Without this, the sidebar profile/status flags stay stale until
+        # the next natural Streamlit rerun (e.g. tab switch).
+        # The assistant message is already written above so rerun is safe here.
+        st.rerun()
+
 
 def render_access_tab() -> None:
     """Access requests and DL subscriptions panel."""
@@ -729,7 +766,12 @@ def render_learning_tab() -> None:
                     # Inline read expander — click to read the doc without leaving the app
                     with st.expander(f"📖 Read: {doc['doc_title']}"):
                         doc_content = _read_doc(doc["doc_path"])
-                        st.markdown(doc_content)
+                        # Wrap in .doc-reader so CSS overrides apply cleanly
+                        # without fighting Streamlit's dark theme defaults
+                        st.markdown(
+                            f'<div class="doc-reader">' + doc_content + '</div>',
+                            unsafe_allow_html=True
+                        )
 
                 with col_btn:
                     # Only show the button for not_started and in_progress docs
