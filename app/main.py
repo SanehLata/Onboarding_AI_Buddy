@@ -154,8 +154,9 @@ html, body, [class*="css"] {
     gap: 0.6rem;
 }
 .doc-card:hover { border-color: #30363d; }
-.doc-title { font-size: 0.82rem; color: #c9d1d9; font-weight: 500; }
-.doc-reason { font-size: 0.72rem; color: #6e7681; margin-top: 2px; }
+.doc-title { font-size: 0.82rem; color: #e6edf3 !important; font-weight: 600; }
+.doc-title * { color: #e6edf3 !important; }
+.doc-reason { font-size: 0.72rem; color: #8b949e !important; margin-top: 2px; }
 
 /* ── Welcome banner ── */
 .welcome-banner {
@@ -223,6 +224,30 @@ html, body, [class*="css"] {
     background: #161b22;
     border: 1px solid #21262d;
     border-radius: 8px;
+}
+
+/* ── Expander label text — force readable color ──────────────────── */
+/* Streamlit renders expander labels in <summary><p> or <summary><span> */
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary span,
+[data-testid="stExpander"] details > summary > * {
+    color: #8b949e !important;
+}
+
+/* Doc read expander (nested) — the "📖 Read: Title" label */
+[data-testid="stExpander"] [data-testid="stExpander"] summary,
+[data-testid="stExpander"] [data-testid="stExpander"] summary p,
+[data-testid="stExpander"] [data-testid="stExpander"] summary span {
+    color: #8b949e !important;
+    font-size: 0.78rem !important;
+}
+
+/* Category expander header — "🧭 Onboarding (2/7 completed)" */
+/* Give the top-level expanders a slightly brighter label */
+.stExpander > details > summary p {
+    color: #c9d1d9 !important;
+    font-weight: 500 !important;
 }
 
 /* ── Doc reader expander — nested inside category expander ── */
@@ -601,7 +626,7 @@ def render_chat_tab() -> None:
                     _send_message(user_input)
                 st.markdown(st.session_state.chat_history[-1]["content"])
 
-        # Bug Fix: Rerun so the sidebar re-renders with the updated graph_state.
+        # Rerun so the sidebar re-renders with the updated graph_state.
         # Without this, the sidebar profile/status flags stay stale until
         # the next natural Streamlit rerun (e.g. tab switch).
         # The assistant message is already written above so rerun is safe here.
