@@ -11,8 +11,11 @@ from pathlib import Path
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH  = BASE_DIR / "mock_db" / "onboarding.db"
+BASE_DIR       = Path(__file__).resolve().parent.parent
+DB_PATH        = BASE_DIR / "mock_db" / "onboarding.db"
+TEAMS_JSON     = BASE_DIR / "mock_db" / "teams.json"
+SYSTEMS_JSON   = BASE_DIR / "mock_db" / "systems.json"
+DL_GROUPS_JSON = BASE_DIR / "mock_db" / "dl_groups.json"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -68,10 +71,13 @@ CREATE TABLE IF NOT EXISTS access_requests (
     ticket_id         TEXT,              -- mock ticket ID returned by ticketing tool
     ticket_summary    TEXT NOT NULL,
     status            TEXT NOT NULL DEFAULT 'pending'
-                      CHECK (status IN ('pending', 'raised', 'in_progress', 'approved', 'completed', 'failed')),
+                      CHECK (status IN ('pending', 'raised', 'in_progress',
+                                        'pending_approval', 'approved',
+                                        'completed', 'failed', 'rejected')),
     access_level      TEXT NOT NULL,
     requires_approval INTEGER NOT NULL DEFAULT 0,
-    approved_by       TEXT,
+    approved_by       TEXT,              -- email of manager who approved/rejected
+    rejected_by       TEXT,
     sla_hours         INTEGER NOT NULL,
     raised_at         TEXT,
     resolved_at       TEXT,
@@ -481,6 +487,10 @@ def seed_agent_log(conn: sqlite3.Connection, developers: list[dict]) -> None:
 
 def run():
     print_header("Onboarding Buddy — Database Generator")
+
+    # Run JSON schema validation first:
+    #   python data/seeds/validate_json_schema.py
+    # This script does not validate — it only creates and seeds the database.
 
     # Ensure the mock_db directory exists
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)

@@ -33,6 +33,8 @@ from memory.progress import (
 from memory.profile_store import (
     get_access_requests,
     get_dl_subscriptions,
+    get_agent_action_log,
+    get_sessions_for_developer,
 )
 
 
@@ -350,6 +352,7 @@ def _badge(status: str) -> str:
         "not_started":      ("badge-gray",   "○ not started"),
         "pending_approval": ("badge-yellow", "◑ pending approval"),
         "provisioned":      ("badge-green",  "✓ provisioned"),
+        "rejected":         ("badge-red",    "✗ rejected"),
     }
     cls, label = mapping.get(status, ("badge-gray", status))
     return f'<span class="badge {cls}">{label}</span>'
@@ -634,66 +637,205 @@ def render_chat_tab() -> None:
 
 
 def render_access_tab() -> None:
-    """Access requests and DL subscriptions panel."""
-    dev_id = _dev_id()
+    """
+    Access tab — developer's personal view of their provisioning status.
+    Groups tickets by approval status, shows approver info and SLA,
+    and lets the developer send a mock chase email for pending items.
+    """
+    from datetime import datetime, timedelta
+    from tools.email import send_welcome_email as _mock_send  # reuse mock send
+
+    dev_id  = _dev_id()
+    profile = _profile()
 
     if not dev_id or not _is_provisioned():
         st.markdown("""
         <div style="text-align:center;padding:3rem;color:#6e7681;">
             <div style="font-size:2rem;margin-bottom:0.5rem;">🔐</div>
-            <div style="font-size:0.9rem;">Access provisioning will appear here after your profile is collected.</div>
+            <div style="font-size:0.9rem;">
+                Access provisioning will appear here after your profile is complete.
+            </div>
         </div>
         """, unsafe_allow_html=True)
         return
 
-    # Access tickets
-    tickets = get_access_requests(dev_id)
-    if tickets:
-        st.markdown('<div class="section-label">System Access Tickets</div>', unsafe_allow_html=True)
-        for t in tickets:
-            badge_html = _badge(t["status"])
-            ticket_id  = t.get("ticket_id") or "—"
-            st.markdown(f"""
-            <div class="ticket-row">
-                <div>
-                    <span class="ticket-name">{t['system_name']}</span>
-                    <span style="font-size:0.72rem;color:#6e7681;margin-left:0.5rem;">
-                        {t['ticket_type']} · {t['access_level']}
-                    </span>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.7rem;">
-                    <span class="ticket-id">{ticket_id}</span>
-                    {badge_html}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # DL subscriptions
+    tickets       = get_access_requests(dev_id)
     subscriptions = get_dl_subscriptions(dev_id)
-    if subscriptions:
-        st.markdown('<div class="section-label">Distribution List Subscriptions</div>',
-                    unsafe_allow_html=True)
-        for s in subscriptions:
-            badge_html = _badge(s["status"])
-            st.markdown(f"""
-            <div class="ticket-row">
-                <div>
-                    <span class="ticket-name">{s['dl_name']}</span>
-                    <span style="font-size:0.72rem;color:#6e7681;margin-left:0.5rem;">
-                        {s['dl_email']}
-                    </span>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.7rem;">
-                    <span style="font-size:0.72rem;color:#6e7681;">{s['owner_name']}</span>
-                    {badge_html}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 
     if not tickets and not subscriptions:
         st.info("No provisioning records found.")
+        return
+
+    # ── Summary metrics ───────────────────────────────────────────────────────
+    total    = len(tickets)
+    approved = sum(1 for t in tickets if t["status"] in ("approved", "completed"))
+    pending  = sum(1 for t in tickets if t["status"] in ("raised", "pending_approval"))
+    failed   = sum(1 for t in tickets if t["status"] == "failed")
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Requests", total)
+    with col2:
+        st.metric("Approved", approved)
+    with col3:
+        st.metric("Pending Approval", pending,
+                  delta="Awaiting manager" if pending else None,
+                  delta_color="off")
+    with col4:
+        st.metric("Failed", failed,
+                  delta="Needs attention" if failed else None,
+                  delta_color="inverse" if failed else "off")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Tickets needing approval (highlighted section) ────────────────────────
+    pending_tickets = [t for t in tickets if t["status"] in ("raised", "pending_approval")]
+    if pending_tickets:
+        st.markdown('<div class="section-label">⏳ Pending Manager Approval</div>',
+                    unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background:#2d2000;border:1px solid #9e6a03;border-radius:8px;
+                    padding:0.6rem 1rem;margin-bottom:0.8rem;font-size:0.78rem;color:#e3b341;">
+            These requests require your manager's approval before access is granted.
+            Your manager has been notified — use the chase button if approval is overdue.
+        </div>
+        """, unsafe_allow_html=True)
+
+        for t in pending_tickets:
+            req_id    = t.get("ticket_id") or "—"
+            badge     = _badge("pending_approval")
+
+            # SLA countdown
+            sla_info  = ""
+            if t.get("raised_at") and t.get("sla_hours"):
+                try:
+                    raised   = datetime.fromisoformat(t["raised_at"])
+                    deadline = raised + timedelta(hours=t["sla_hours"])
+                    remaining = deadline - datetime.utcnow()
+                    hours_left = int(remaining.total_seconds() / 3600)
+                    if hours_left < 0:
+                        sla_info = '<span style="color:#f85149;font-size:0.7rem;">⚠️ SLA breached</span>'
+                    elif hours_left < 4:
+                        sla_info = f'<span style="color:#e3b341;font-size:0.7rem;">⚠️ {hours_left}h left</span>'
+                    else:
+                        sla_info = f'<span style="color:#6e7681;font-size:0.7rem;">{hours_left}h SLA remaining</span>'
+                except Exception:
+                    pass
+
+            col_info, col_btn = st.columns([8, 2])
+            with col_info:
+                st.markdown(f"""
+                <div class="ticket-row" style="border-color:#9e6a03;">
+                    <div>
+                        <div style="font-weight:600;font-size:0.83rem;color:#e6edf3;">
+                            {t["system_name"]}
+                        </div>
+                        <div style="font-size:0.72rem;color:#8b949e;margin-top:2px;">
+                            {t["ticket_type"]} · {t["access_level"]} · {req_id}
+                        </div>
+                        <div style="margin-top:4px;">{sla_info}</div>
+                    </div>
+                    {badge}
+                </div>
+                """, unsafe_allow_html=True)
+            with col_btn:
+                chase_key = f"chase_{t['id']}"
+                if st.button("📧 Chase", key=chase_key, type="secondary",
+                             help="Send a reminder email to your manager"):
+                    log.info("[APP] chase email sent — dev_id=%s ticket_id=%s system=%s",
+                             dev_id, t.get("ticket_id"), t["system_name"])
+                    st.toast(
+                        f"Reminder sent to {profile.get('manager_name', 'your manager')} "
+                        f"for {t['system_name']} access.",
+                        icon="📧"
+                    )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Approved / completed tickets ──────────────────────────────────────────
+    done_tickets = [t for t in tickets if t["status"] in ("approved", "completed")]
+    if done_tickets:
+        st.markdown('<div class="section-label">✅ Approved Access</div>',
+                    unsafe_allow_html=True)
+        for t in done_tickets:
+            badge  = _badge("approved")
+            req_id = t.get("ticket_id") or "—"
+            st.markdown(f"""
+            <div class="ticket-row" style="border-color:#238636;">
+                <div>
+                    <div style="font-weight:600;font-size:0.83rem;color:#e6edf3;">
+                        {t["system_name"]}
+                    </div>
+                    <div style="font-size:0.72rem;color:#8b949e;margin-top:2px;">
+                        {t["ticket_type"]} · {t["access_level"]} · {req_id}
+                    </div>
+                </div>
+                {badge}
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Auto-provisioned (no approval needed) ─────────────────────────────────
+    auto_tickets = [t for t in tickets
+                    if t["status"] == "raised" and not t.get("requires_approval")]
+    if auto_tickets:
+        st.markdown('<div class="section-label">⚡ Auto-Provisioned</div>',
+                    unsafe_allow_html=True)
+        for t in auto_tickets:
+            badge  = _badge("provisioned")
+            req_id = t.get("ticket_id") or "—"
+            st.markdown(f"""
+            <div class="ticket-row">
+                <div>
+                    <span class="ticket-name">{t["system_name"]}</span>
+                    <span style="font-size:0.72rem;color:#6e7681;margin-left:0.5rem;">
+                        {t["ticket_type"]} · {t["access_level"]} · {req_id}
+                    </span>
+                </div>
+                {badge}
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Failed tickets ────────────────────────────────────────────────────────
+    failed_tickets = [t for t in tickets if t["status"] == "failed"]
+    if failed_tickets:
+        st.markdown('<div class="section-label">❌ Failed — Action Required</div>',
+                    unsafe_allow_html=True)
+        for t in failed_tickets:
+            badge  = _badge("failed")
+            st.markdown(f"""
+            <div class="ticket-row" style="border-color:#da3633;">
+                <div>
+                    <span class="ticket-name">{t["system_name"]}</span>
+                    <span style="font-size:0.72rem;color:#f85149;margin-left:0.5rem;">
+                        Auto-provisioning failed — please contact IT support
+                    </span>
+                </div>
+                {badge}
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Distribution list subscriptions ──────────────────────────────────────
+    if subscriptions:
+        st.markdown('<div class="section-label">📬 Distribution List Subscriptions</div>',
+                    unsafe_allow_html=True)
+        for s in subscriptions:
+            badge = _badge(s["status"])
+            st.markdown(f"""
+            <div class="ticket-row">
+                <div>
+                    <div style="font-weight:500;font-size:0.83rem;color:#e6edf3;">
+                        {s["dl_name"]}
+                    </div>
+                    <div style="font-size:0.72rem;color:#8b949e;margin-top:2px;">
+                        {s["dl_email"]} · Owner: {s["owner_name"]}
+                    </div>
+                </div>
+                {badge}
+            </div>
+            """, unsafe_allow_html=True)
 
 
 def render_learning_tab() -> None:
@@ -818,121 +960,196 @@ def render_learning_tab() -> None:
 
 
 def render_insights_tab() -> None:
-    """Provisioning summary and agent action log."""
-    dev_id       = _dev_id()
-    prov_results = st.session_state.graph_state.get("provisioning_results", {})
+    """
+    Insights tab — analytics dashboard showing onboarding progress,
+    topic coverage, session history, and the agent action audit log.
+    """
+    import json as _json
+    from datetime import datetime
 
-    # Gate on provisioning_complete (works for both new and returning users)
-    if not _is_provisioned():
+    dev_id  = _dev_id()
+    profile = _profile()
+
+    if not dev_id or not _is_provisioned():
         st.markdown("""
         <div style="text-align:center;padding:3rem;color:#6e7681;">
             <div style="font-size:2rem;margin-bottom:0.5rem;">📊</div>
             <div style="font-size:0.9rem;">
-                Provisioning insights will appear here after onboarding begins.
+                Insights will appear here after onboarding begins.
             </div>
         </div>
         """, unsafe_allow_html=True)
         return
 
-    # Returning user — prov_results is empty (previous session), load from DB
-    is_returning = not prov_results and dev_id
+    summary  = get_progress_summary(dev_id)
+    sessions = get_sessions_for_developer(dev_id)
+    topics   = get_covered_topics(dev_id)
+    actions  = get_agent_action_log(dev_id, limit=15)
 
-    if is_returning:
-        st.markdown("""
-        <div style="background:#161b22;border:1px solid #21262d;border-radius:8px;
-                    padding:0.7rem 1rem;margin-bottom:1rem;font-size:0.8rem;color:#8b949e;">
-            ℹ️  Showing access data from your previous onboarding session.
+    first_name = profile.get("name", "").split()[0] if profile.get("name") else "Developer"
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    st.markdown(f"""
+    <div style="margin-bottom:1.2rem;">
+        <div style="font-size:1.1rem;font-weight:600;color:#f0f6fc;">
+            {first_name}'s Onboarding Analytics
         </div>
-        """, unsafe_allow_html=True)
+        <div style="font-size:0.78rem;color:#6e7681;margin-top:2px;">
+            {profile.get("role_title","Engineer")} · {profile.get("team_name","—")} ·
+            Started {profile.get("start_date","—")}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-        db_tickets = get_access_requests(dev_id)
-        db_subs    = get_dl_subscriptions(dev_id)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Tickets on Record", len(db_tickets))
-        with col2:
-            st.metric("DL Subscriptions",  len(db_subs))
-
-        if db_tickets:
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown('<div class="section-label">Ticket Details</div>',
-                        unsafe_allow_html=True)
-            for t in db_tickets:
-                badge = _badge(t["status"])
-                tid   = t.get("ticket_id") or "—"
-                st.markdown(f"""
-                <div class="ticket-row">
-                    <span class="ticket-name">{t["system_name"]}</span>
-                    <div style="display:flex;align-items:center;gap:0.7rem;">
-                        <span class="ticket-id">{tid}</span>
-                        {badge}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        return
-
-    # New session — full provisioning results in state
-    tickets = prov_results.get("tickets", {})
-    emails  = prov_results.get("dl_emails", {})
-    ad      = prov_results.get("ad_groups", {})
-
+    # ── Top metrics ───────────────────────────────────────────────────────────
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Tickets Raised",  tickets.get("tickets_raised", 0))
+        st.metric("Learning Progress", f"{summary['completion_pct']}%")
     with col2:
-        st.metric("Emails Sent",     emails.get("emails_sent", 0))
+        st.metric("Docs Completed", f"{summary['completed']}/{summary['total_docs']}")
     with col3:
-        st.metric("AD Groups",       ad.get("requests_submitted", 0))
+        st.metric("Questions Asked", summary["total_questions"])
     with col4:
-        total_failed = (
-            tickets.get("tickets_failed", 0) +
-            emails.get("emails_failed", 0) +
-            ad.get("requests_failed", 0)
-        )
-        st.metric("Failed Actions", total_failed)
+        st.metric("Sessions", summary["total_sessions"])
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="section-label">Ticket Details</div>', unsafe_allow_html=True)
 
-    for r in tickets.get("results", []):
-        status = "completed" if r["success"] else "failed"
-        badge  = _badge(status)
-        tid    = r.get("ticket_id") or "—"
-        sla    = f"{r.get('sla_hours', '?')}h SLA" if r.get("sla_hours") else ""
+    # ── Learning path progress bar by category ────────────────────────────────
+    st.markdown('<div class="section-label">Learning Path Breakdown</div>',
+                unsafe_allow_html=True)
+
+    path = get_learning_path(dev_id)
+    category_icons = {"onboarding": "🧭", "architecture": "🏗️", "runbooks": "📋"}
+
+    for cat in ["onboarding", "architecture", "runbooks"]:
+        cat_docs = [d for d in path if d["category"] == cat]
+        if not cat_docs:
+            continue
+        done  = sum(1 for d in cat_docs if d["status"] == "completed")
+        prog  = sum(1 for d in cat_docs if d["status"] == "in_progress")
+        total = len(cat_docs)
+        pct   = round(done / total * 100) if total else 0
+        icon  = category_icons.get(cat, "📄")
+
         st.markdown(f"""
-        <div class="ticket-row">
-            <span class="ticket-name">{r['system_name']}</span>
-            <div style="display:flex;align-items:center;gap:0.7rem;">
-                <span style="font-size:0.72rem;color:#6e7681;">{sla}</span>
-                <span class="ticket-id">{tid}</span>
-                {badge}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="section-label">AD Group Requests</div>', unsafe_allow_html=True)
-
-    for r in ad.get("results", []):
-        status = "provisioned" if (r["success"] and not r.get("approval_required")) \
-                 else ("pending_approval" if r["success"] else "failed")
-        badge  = _badge(status)
-        req_id = r.get("request_id") or "—"
-        st.markdown(f"""
-        <div class="ticket-row">
-            <div>
-                <span class="ticket-name">{r['group']}</span>
-                <span style="font-size:0.72rem;color:#6e7681;margin-left:0.5rem;">
-                    {r['description']}
+        <div style="margin-bottom:0.6rem;">
+            <div style="display:flex;justify-content:space-between;
+                        font-size:0.78rem;color:#c9d1d9;margin-bottom:4px;">
+                <span>{icon} {cat.title()}</span>
+                <span style="color:#8b949e;">{done}/{total} completed
+                    {f"· {prog} in progress" if prog else ""}
                 </span>
             </div>
-            <div style="display:flex;align-items:center;gap:0.7rem;">
-                <span class="ticket-id">{req_id}</span>
-                {badge}
-            </div>
         </div>
         """, unsafe_allow_html=True)
+        st.progress(pct / 100)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Topic coverage ────────────────────────────────────────────────────────
+    if topics:
+        clean_topics = [t for t in topics if t and t.lower() != "none"]
+        st.markdown('<div class="section-label">Topics Explored</div>',
+                    unsafe_allow_html=True)
+        # Show as tag cloud
+        tag_style = (
+            "background:#161b22;border:1px solid #30363d;border-radius:20px;"
+            "padding:3px 10px;font-size:0.72rem;color:#8b949e;"
+            "display:inline-block;margin:2px;"
+        )
+        tags_html = " ".join(
+            f'<span style="{tag_style}">{t}</span>'
+            for t in clean_topics
+        )
+        st.markdown(
+            f'<div style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:1rem;">' +
+            tags_html + '</div>',
+            unsafe_allow_html=True
+        )
+
+    # ── Session history ───────────────────────────────────────────────────────
+    if sessions:
+        st.markdown('<div class="section-label">Session History</div>',
+                    unsafe_allow_html=True)
+        for s in reversed(sessions[-5:]):   # show last 5, newest first
+            try:
+                started = datetime.fromisoformat(s["started_at"]).strftime("%d %b %Y, %H:%M")
+            except Exception:
+                started = s["started_at"][:16] if s["started_at"] else "—"
+
+            topic_count = len(s["topics_covered"])
+            msg_count   = s.get("message_count", 0)
+
+            st.markdown(f"""
+            <div class="ticket-row" style="margin-bottom:0.3rem;">
+                <div>
+                    <div style="font-size:0.8rem;font-weight:500;color:#c9d1d9;">
+                        Session {s["id"]}
+                    </div>
+                    <div style="font-size:0.72rem;color:#6e7681;margin-top:1px;">
+                        {started}
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:0.78rem;color:#8b949e;">
+                        {msg_count} messages · {topic_count} topics
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Agent action log ──────────────────────────────────────────────────────
+    if actions:
+        st.markdown('<div class="section-label">Agent Action Log</div>',
+                    unsafe_allow_html=True)
+
+        action_icons = {
+            "PROFILE_COMPLETE":      "👤",
+            "PATH_GENERATED":        "📚",
+            "TICKET_RAISED":         "🎟️",
+            "EMAIL_SENT":            "📧",
+            "AD_GROUPS_REQUESTED":   "🔐",
+            "WELCOME_EMAIL_SENT":    "✉️",
+            "RETURNING_USER_LOGIN":  "👋",
+            "HITL_ACCEPTED":         "✅",
+            "HITL_DECLINED":         "↩️",
+            "ESCALATION":            "🚨",
+        }
+
+        for a in actions:
+            icon   = action_icons.get(a["action_type"], "⚙️")
+            color  = "#f85149" if a["status"] == "failed" else "#3fb950"
+            status_dot = f'<span style="color:{color};font-size:0.6rem;">●</span>'
+            try:
+                ts = datetime.fromisoformat(a["created_at"]).strftime("%d %b, %H:%M")
+            except Exception:
+                ts = a["created_at"][:16] if a["created_at"] else "—"
+
+            # Parse action_data for a useful summary
+            try:
+                data = _json.loads(a.get("action_data") or "{}")
+                detail = ", ".join(f"{k}={v}" for k, v in list(data.items())[:2])
+            except Exception:
+                detail = ""
+
+            st.markdown(f"""
+            <div style="display:flex;align-items:flex-start;gap:0.6rem;
+                        padding:0.4rem 0;border-bottom:1px solid #21262d;">
+                <span style="font-size:0.9rem;margin-top:1px;">{icon}</span>
+                <div style="flex:1;">
+                    <div style="font-size:0.8rem;color:#c9d1d9;">
+                        {status_dot} {a["action_type"].replace("_", " ").title()}
+                    </div>
+                    <div style="font-size:0.7rem;color:#6e7681;">
+                        {detail}
+                    </div>
+                </div>
+                <span style="font-size:0.7rem;color:#484f58;white-space:nowrap;">{ts}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
 
 # ── Layout assembly ───────────────────────────────────────────────────────────
 

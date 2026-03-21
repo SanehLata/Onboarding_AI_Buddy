@@ -355,3 +355,92 @@ def log_agent_action(
                 _now(),
             ),
         )
+
+
+# ── Manager queries ───────────────────────────────────────────────────────────
+
+def get_all_pending_requests() -> list[dict]:
+    """
+    Return all access requests with requires_approval=1 and status='raised',
+    joined with developer name and email. Used by the manager approval screen.
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                ar.id, ar.developer_id, ar.system_name, ar.ticket_id,
+                ar.ticket_summary, ar.access_level, ar.ticket_type,
+                ar.sla_hours, ar.raised_at, ar.status,
+                dp.name  AS developer_name,
+                dp.email AS developer_email,
+                dp.team_name, dp.manager_email
+            FROM access_requests ar
+            JOIN developer_profiles dp ON ar.developer_id = dp.id
+            WHERE ar.requires_approval = 1
+              AND ar.status IN ('raised', 'pending_approval')
+            ORDER BY ar.raised_at ASC
+            """,
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_all_access_requests_for_manager(manager_email: str) -> list[dict]:
+    """
+    Return all access requests for developers reporting to this manager,
+    including approved and completed — for the full history view.
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                ar.id, ar.developer_id, ar.system_name, ar.ticket_id,
+                ar.ticket_summary, ar.access_level, ar.ticket_type,
+                ar.sla_hours, ar.raised_at, ar.status, ar.requires_approval,
+                dp.name  AS developer_name,
+                dp.email AS developer_email,
+                dp.team_name
+            FROM access_requests ar
+            JOIN developer_profiles dp ON ar.developer_id = dp.id
+            WHERE dp.manager_email = ?
+            ORDER BY ar.raised_at DESC
+            """,
+            (manager_email,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_agent_action_log(developer_id: int, limit: int = 20) -> list[dict]:
+    """Return recent agent action log entries for a developer."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT action_type, action_data, status, error, created_at
+            FROM agent_action_log
+            WHERE developer_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (developer_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_sessions_for_developer(developer_id: int) -> list[dict]:
+    """Return all sessions for a developer with message counts."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, started_at, ended_at, message_count, topics_covered
+            FROM sessions
+            WHERE developer_id = ?
+            ORDER BY started_at ASC
+            """,
+            (developer_id,),
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        import json as _json
+        d["topics_covered"] = _json.loads(d["topics_covered"] or "[]")
+        result.append(d)
+    return result
