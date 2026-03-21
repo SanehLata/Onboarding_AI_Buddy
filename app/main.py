@@ -719,7 +719,7 @@ def render_access_tab() -> None:
 
     # Auto-complete DL subscriptions older than 48 hours — simulates the DL
     # owner manually adding the developer in Outlook after receiving the email.
-    auto_complete_dl_subscriptions(dev_id, hours_threshold=48)
+    auto_complete_dl_subscriptions(dev_id, business_hours_threshold=48)
 
     subscriptions = get_dl_subscriptions(dev_id)
 

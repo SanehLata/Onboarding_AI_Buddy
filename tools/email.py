@@ -12,7 +12,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import smtplib
+import os
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 from config import DL_GROUPS_JSON, MAX_RETRIES, RETRY_DELAY_SECONDS, log
+
+# ── Gmail credentials (set in .env to enable real welcome emails) ────────────
+GMAIL_SENDER_EMAIL   = os.getenv("GMAIL_SENDER_EMAIL", "")
+GMAIL_APP_PASSWORD   = os.getenv("GMAIL_APP_PASSWORD", "")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -87,6 +96,45 @@ def _mock_send(
         "subject":     subject,
         "sent_at":     _now(),
         "status":      "delivered",
+    }
+
+
+def _smtp_send(
+    to_email: str,
+    to_name: str,
+    subject: str,
+    body: str,
+) -> dict:
+    """
+    Send a real email via Gmail SMTP using an App Password.
+    Requires GMAIL_SENDER_EMAIL and GMAIL_APP_PASSWORD in .env.
+
+    Gmail SMTP settings:
+        Host : smtp.gmail.com
+        Port : 587 (STARTTLS)
+    """
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = f"Onboarding Buddy <{GMAIL_SENDER_EMAIL}>"
+    msg["To"]      = f"{to_name} <{to_email}>"
+    msg["Message-ID"] = _message_id()
+
+    # Plain text part
+    msg.attach(MIMEText(body, "plain"))
+
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(GMAIL_SENDER_EMAIL, GMAIL_APP_PASSWORD)
+        server.sendmail(GMAIL_SENDER_EMAIL, to_email, msg.as_string())
+
+    return {
+        "message_id": msg["Message-ID"],
+        "to_email":   to_email,
+        "to_name":    to_name,
+        "subject":    subject,
+        "sent_at":    _now(),
+        "status":     "delivered",
     }
 
 
@@ -309,10 +357,18 @@ Onboarding Buddy — TechCorp Engineering
     attempt    = 0
     last_error = None
 
+    # Use real SMTP if Gmail credentials are configured, otherwise mock
+    use_real_smtp = bool(GMAIL_SENDER_EMAIL and GMAIL_APP_PASSWORD)
+    send_fn       = _smtp_send if use_real_smtp else _mock_send
+    log.info(
+        "[EMAIL] send_welcome_email — using %s",
+        "REAL Gmail SMTP" if use_real_smtp else "mock sender"
+    )
+
     while attempt < MAX_RETRIES:
         attempt += 1
         try:
-            receipt = _mock_send(
+            receipt = send_fn(
                 to_email=developer_email,
                 to_name=developer_name,
                 subject=subject,
