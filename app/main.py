@@ -35,6 +35,7 @@ from memory.profile_store import (
     get_dl_subscriptions,
     get_agent_action_log,
     get_sessions_for_developer,
+    auto_complete_dl_subscriptions,
 )
 
 
@@ -283,6 +284,61 @@ html, body, [class*="css"] {
 .doc-reader ul, .doc-reader ol { padding-left: 1.4rem; }
 .doc-reader input[type="checkbox"] { accent-color: #238636; }
 
+/* ── Insights tab — topic tags ──────────────────────────────────────── */
+/* Tags are plain spans inside st.markdown — force text color */
+.topic-tag {
+    color: #8b949e !important;
+    background: #161b22 !important;
+    border: 1px solid #30363d !important;
+}
+
+/* ── Metric cards — force label and value colors ─────────────────── */
+/* Streamlit sometimes resets these in light mode contexts */
+[data-testid="stMetric"] {
+    background: #161b22 !important;
+    border: 1px solid #21262d !important;
+    border-radius: 10px !important;
+    padding: 0.8rem 1rem !important;
+}
+[data-testid="stMetricValue"] > div,
+[data-testid="stMetricValue"] {
+    color: #58a6ff !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 1.6rem !important;
+}
+[data-testid="stMetricLabel"] > div,
+[data-testid="stMetricLabel"] {
+    color: #8b949e !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+}
+
+/* ── Insights session history cards ──────────────────────────────── */
+/* ticket-row is already defined but the text inside needs forcing    */
+.ticket-row * { color: inherit; }
+.ticket-row .session-id   { font-size: 0.8rem; font-weight: 500; color: #c9d1d9 !important; }
+.ticket-row .session-date { font-size: 0.72rem; color: #6e7681 !important; margin-top: 1px; }
+.ticket-row .session-stat { font-size: 0.78rem; color: #8b949e !important; }
+
+/* ── Tab labels — force readable color on all tabs ───────────────── */
+[data-baseweb="tab"] p,
+[data-baseweb="tab"] span,
+[data-baseweb="tab"] div {
+    color: #8b949e !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+}
+[aria-selected="true"][data-baseweb="tab"] p,
+[aria-selected="true"][data-baseweb="tab"] span,
+[aria-selected="true"][data-baseweb="tab"] div {
+    color: #f0f6fc !important;
+}
+
+/* ── Insights header text ────────────────────────────────────────── */
+.insights-header-title { color: #f0f6fc !important; }
+.insights-header-meta  { color: #6e7681 !important; }
+
 /* ── Mark as read button ── */
 .stButton > button[kind="secondary"] {
     background: transparent;
@@ -347,7 +403,7 @@ def _badge(status: str) -> str:
         "approved":         ("badge-green",  "✓ approved"),
         "pending":          ("badge-gray",   "○ pending"),
         "failed":           ("badge-red",    "✗ failed"),
-        "email_sent":       ("badge-blue",   "⊙ sent"),
+        "email_sent":       ("badge-blue",   "⊙ owner notified"),
         "subscribed":       ("badge-green",  "✓ subscribed"),
         "not_started":      ("badge-gray",   "○ not started"),
         "pending_approval": ("badge-yellow", "◑ pending approval"),
@@ -660,6 +716,11 @@ def render_access_tab() -> None:
         return
 
     tickets       = get_access_requests(dev_id)
+
+    # Auto-complete DL subscriptions older than 48 hours — simulates the DL
+    # owner manually adding the developer in Outlook after receiving the email.
+    auto_complete_dl_subscriptions(dev_id, hours_threshold=48)
+
     subscriptions = get_dl_subscriptions(dev_id)
 
     if not tickets and not subscriptions:
@@ -821,6 +882,13 @@ def render_access_tab() -> None:
     if subscriptions:
         st.markdown('<div class="section-label">📬 Distribution List Subscriptions</div>',
                     unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background:#0c2d6b;border:1px solid #1f6feb;border-radius:8px;
+                    padding:0.6rem 1rem;margin-bottom:0.8rem;font-size:0.78rem;color:#58a6ff;">
+            📨 Subscription emails have been sent to each DL owner.
+            You will be added manually within 1–2 business days — no further action needed.
+        </div>
+        """, unsafe_allow_html=True)
         for s in subscriptions:
             badge = _badge(s["status"])
             st.markdown(f"""
@@ -989,17 +1057,14 @@ def render_insights_tab() -> None:
     first_name = profile.get("name", "").split()[0] if profile.get("name") else "Developer"
 
     # ── Header ────────────────────────────────────────────────────────────────
-    st.markdown(f"""
-    <div style="margin-bottom:1.2rem;">
-        <div style="font-size:1.1rem;font-weight:600;color:#f0f6fc;">
-            {first_name}'s Onboarding Analytics
-        </div>
-        <div style="font-size:0.78rem;color:#6e7681;margin-top:2px;">
-            {profile.get("role_title","Engineer")} · {profile.get("team_name","—")} ·
-            Started {profile.get("start_date","—")}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div style="margin-bottom:1.2rem;">'
+        f'<div class="insights-header-title" style="font-size:1.1rem;font-weight:600;">{first_name}\'s Onboarding Analytics</div>'
+        f'<div class="insights-header-meta" style="font-size:0.78rem;margin-top:2px;">'
+        f'{profile.get("role_title","Engineer")} · {profile.get("team_name","—")} · Started {profile.get("start_date","—")}'
+        f'</div></div>',
+        unsafe_allow_html=True
+    )
 
     # ── Top metrics ───────────────────────────────────────────────────────────
     col1, col2, col3, col4 = st.columns(4)
@@ -1031,18 +1096,17 @@ def render_insights_tab() -> None:
         pct   = round(done / total * 100) if total else 0
         icon  = category_icons.get(cat, "📄")
 
-        st.markdown(f"""
-        <div style="margin-bottom:0.6rem;">
-            <div style="display:flex;justify-content:space-between;
-                        font-size:0.78rem;color:#c9d1d9;margin-bottom:4px;">
-                <span>{icon} {cat.title()}</span>
-                <span style="color:#8b949e;">{done}/{total} completed
-                    {f"· {prog} in progress" if prog else ""}
-                </span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        in_progress_label = f" · {prog} in progress" if prog else ""
+        row_html = (
+            f'<div style="display:flex;justify-content:space-between;'
+            f'font-size:0.78rem;color:#c9d1d9;margin-bottom:4px;">'
+            f'<span>{icon} {cat.title()}</span>'
+            f'<span style="color:#8b949e;">{done}/{total} completed{in_progress_label}</span>'
+            f'</div>'
+        )
+        st.markdown(row_html, unsafe_allow_html=True)
         st.progress(pct / 100)
+        st.markdown("<div style='margin-bottom:0.4rem;'></div>", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1052,13 +1116,9 @@ def render_insights_tab() -> None:
         st.markdown('<div class="section-label">Topics Explored</div>',
                     unsafe_allow_html=True)
         # Show as tag cloud
-        tag_style = (
-            "background:#161b22;border:1px solid #30363d;border-radius:20px;"
-            "padding:3px 10px;font-size:0.72rem;color:#8b949e;"
-            "display:inline-block;margin:2px;"
-        )
         tags_html = " ".join(
-            f'<span style="{tag_style}">{t}</span>'
+            f'<span class="topic-tag" style="border-radius:20px;padding:3px 10px;'
+            f'font-size:0.72rem;display:inline-block;margin:2px;">{t}</span>'
             for t in clean_topics
         )
         st.markdown(
@@ -1080,23 +1140,17 @@ def render_insights_tab() -> None:
             topic_count = len(s["topics_covered"])
             msg_count   = s.get("message_count", 0)
 
-            st.markdown(f"""
-            <div class="ticket-row" style="margin-bottom:0.3rem;">
-                <div>
-                    <div style="font-size:0.8rem;font-weight:500;color:#c9d1d9;">
-                        Session {s["id"]}
-                    </div>
-                    <div style="font-size:0.72rem;color:#6e7681;margin-top:1px;">
-                        {started}
-                    </div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="font-size:0.78rem;color:#8b949e;">
-                        {msg_count} messages · {topic_count} topics
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="ticket-row" style="margin-bottom:0.3rem;">'
+                f'<div>'
+                f'<div class="session-id">Session {s["id"]}</div>'
+                f'<div class="session-date">{started}</div>'
+                f'</div>'
+                f'<div style="text-align:right;">'
+                f'<div class="session-stat">{msg_count} messages · {topic_count} topics</div>'
+                f'</div></div>',
+                unsafe_allow_html=True
+            )
 
     st.markdown("<br>", unsafe_allow_html=True)
 

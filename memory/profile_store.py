@@ -444,3 +444,107 @@ def get_sessions_for_developer(developer_id: int) -> list[dict]:
         d["topics_covered"] = _json.loads(d["topics_covered"] or "[]")
         result.append(d)
     return result
+
+
+# ── DL subscription auto-completion ──────────────────────────────────────────
+
+def _business_hours_elapsed(sent_at_iso: str) -> float:
+    """
+    Calculate the number of business hours elapsed since sent_at_iso.
+    Business hours: Monday–Friday 09:00–17:00 UTC.
+    Weekends and outside-hours time do not count.
+    """
+    from datetime import datetime, timedelta
+
+    try:
+        start = datetime.fromisoformat(sent_at_iso)
+    except Exception:
+        return 0.0
+
+    now   = datetime.utcnow()
+    if now <= start:
+        return 0.0
+
+    WORK_START = 9   # 09:00 UTC
+    WORK_END   = 17  # 17:00 UTC
+
+    elapsed_bh = 0.0
+    current    = start
+
+    while current < now:
+        # Skip weekends (5=Saturday, 6=Sunday)
+        if current.weekday() >= 5:
+            current += timedelta(hours=1)
+            continue
+
+        hour = current.hour
+        if hour < WORK_START or hour >= WORK_END:
+            current += timedelta(hours=1)
+            continue
+
+        # This hour is a business hour — count how much of it has elapsed
+        next_hour = current.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        chunk_end = min(next_hour, now)
+        elapsed_bh += (chunk_end - current).total_seconds() / 3600.0
+        current = next_hour
+
+    return elapsed_bh
+
+
+def auto_complete_dl_subscriptions(
+    developer_id: int,
+    business_hours_threshold: int = 24,
+) -> int:
+    """
+    Simulate the DL owner manually adding the developer in Outlook.
+
+    Any subscription in 'email_sent' status where the elapsed business
+    hours since email_sent_at exceeds business_hours_threshold is
+    automatically moved to 'subscribed'.
+
+    Uses business hours (Mon–Fri 09:00–17:00 UTC) so weekends and
+    out-of-hours time don't count toward the threshold — mirroring
+    real behaviour where the DL owner acts during working hours.
+
+    Called lazily when the Access tab renders — no background job needed.
+    Returns the number of subscriptions updated.
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, email_sent_at
+            FROM   dl_subscriptions
+            WHERE  developer_id = ?
+              AND  status       = 'email_sent'
+              AND  email_sent_at IS NOT NULL
+            """,
+            (developer_id,),
+        ).fetchall()
+
+    to_update = [
+        r["id"] for r in rows
+        if _business_hours_elapsed(r["email_sent_at"]) >= business_hours_threshold
+    ]
+
+    if not to_update:
+        return 0
+
+    placeholders = ",".join("?" * len(to_update))
+    with _connect() as conn:
+        cursor = conn.execute(
+            f"""
+            UPDATE dl_subscriptions
+            SET    status     = 'subscribed',
+                   updated_at = ?
+            WHERE  id IN ({placeholders})
+            """,
+            [_now()] + to_update,
+        )
+        updated = cursor.rowcount
+
+    log.info(
+        "[PROFILE_STORE] auto_complete_dl_subscriptions — "
+        "dev_id=%s updated=%d threshold=%d business hours",
+        developer_id, updated, business_hours_threshold
+    )
+    return updated
