@@ -11,7 +11,7 @@
 
 ---
 
-![Architecture](docs/architecture.svg)
+## Application Architecture ![Architecture](docs/architecture.svg)
 
 ## What It Does
 
@@ -31,7 +31,7 @@ Traditional developer onboarding involves manual ticket-raising, chasing DL owne
 
 ---
 
-## Architecture
+## Technical Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -79,10 +79,15 @@ Traditional developer onboarding involves manual ticket-raising, chasing DL owne
 
 ---
 
+
+
+
 ## Key Technical Patterns
 
 ### 1. Agentic Orchestration (LangGraph)
 The system uses a **stateful directed graph** rather than a simple chain. The orchestrator node classifies intent, checks state flags, and routes to the appropriate node on every turn. State persists across the conversation including profile completeness, provisioning status, HITL flags, and nudge counts.
+
+![Agent Graph](docs/graph_diagram.png)
 
 ### 2. Retrieval-Augmented Generation (RAG)
 The knowledge base contains 21 markdown documents across 3 categories (Onboarding, Architecture, Runbooks). Documents are chunked (500 tokens, 100 overlap), embedded with `sentence-transformers/all-MiniLM-L6-v2`, and stored in ChromaDB. At query time, top-4 chunks are retrieved and injected into the LLM context with a grounding system prompt.
@@ -176,8 +181,8 @@ ai-onboarding-buddy/
 
 ```bash
 # 1. Clone and create virtual environment
-git clone <repo-url>
-cd ai-onboarding-buddy
+git clone https://github.com/SanehLata/Onboarding_AI_Buddy
+cd Onboarding_AI_Buddy
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 # source .venv/bin/activate     # Mac/Linux
@@ -268,12 +273,17 @@ Buddy:  ✅ Document marked complete, learning path updated
 **Local logs** — written to `logs/onboarding_buddy.log` and terminal. Every module logs with a `[MODULE]` prefix and structured `key=value` fields:
 
 ```
-2026-03-20 10:58:07  INFO  [ORCHESTRATOR] → route=PROVISION
-2026-03-20 10:58:08  INFO  [TICKETING] ticket raised — ticket_id='JIRA-26573' system='Jira' sla_hours=24
-2026-03-20 10:58:14  INFO  [EMAIL] send_welcome_email — using REAL Gmail SMTP
-2026-03-20 10:58:15  INFO  [ACCESS] AD group request submitted — group='grp-risk-eng' status='provisioned'
-2026-03-20 10:59:14  INFO  [GENERATE_PATH] LLM returned 10 documents
-2026-03-20 10:59:38  INFO  [PROGRESS] get_hitl_candidate — candidate found doc='access_provisioning.md'
+2026-03-21 18:07:35  INFO      onboarding_buddy  [learning.py:generate_learning_path:153]  [GENERATE_PATH] entry — dev_id=9 name='Thayer Cole' team='Risk & Compliance' level='mid'
+2026-03-21 18:07:35  INFO      onboarding_buddy  [learning.py:_get_llm:38]  [LLM] initialising ChatGroq — model=llama-3.3-70b-versatile temperature=0
+2026-03-21 18:07:36  INFO      onboarding_buddy  [learning.py:generate_learning_path:163]  [GENERATE_PATH] skill analysis — required=8 gaps=7 gap_list=['Machine Learning', 'SQL', 'Spark', 'Snowflake', 'Risk Modelling', 'Regulatory Reporting', 'Pandas']
+2026-03-21 18:07:36  INFO      onboarding_buddy  [learning.py:generate_learning_path:184]  [GENERATE_PATH] calling LLM for path generation — model=llama-3.3-70b-versatile
+2026-03-21 18:07:38  INFO      onboarding_buddy  [learning.py:generate_learning_path:196]  [GENERATE_PATH] LLM returned 10 documents
+2026-03-21 18:07:38  INFO      onboarding_buddy  [progress.py:save_learning_path:221]  [PROGRESS] save_learning_path — cleared existing path for dev_id=9
+2026-03-21 18:07:38  INFO      onboarding_buddy  [progress.py:save_learning_path:254]  [PROGRESS] save_learning_path — inserted 10 docs for dev_id=9
+2026-03-21 18:07:38  INFO      onboarding_buddy  [learning.py:generate_learning_path:206]  [GENERATE_PATH] learning path persisted — dev_id=9 doc_count=10
+2026-03-21 18:07:38  INFO      onboarding_buddy  [profile_store.py:log_agent_action:329]  [PROFILE_STORE] INSERT agent_action_log — dev_id=9 session_id=36 action='PATH_GENERATED' status=success
+2026-03-21 18:07:38  INFO      onboarding_buddy  [graph.py:provision_node:300]  [PROVISION_NODE] learning path generated — dev_id=9 doc_count=10
+
 ```
 
 ---
@@ -286,26 +296,6 @@ Building production-grade agentic AI systems
 
 ---
 
-*Built with LangGraph · Groq · ChromaDB · Streamlit*
 
 
-pip install -r requirements.txt
-python data/seeds/gen_docs.py       # validate all 21 docs exist
-python data/seeds/validate_json_schema.py       # verify json schemas are in line with their usage
-python data/seeds/gen_db.py         # create SQLite DB + seed developers
-python data/seeds/embed_docs.py     # chunk → embed → store in ChromaDB
-streamlit run app/main.py           # launch the app
-```
 
-One dependency note — `embed_docs.py` needs these packages in your `requirements.txt`:
-```
-langchain
-langchain-text-splitters
-langchain-huggingface
-langchain-chroma
-chromadb
-sentence-transformers
-
-
-## Agent Graph
-![Agent Graph](docs/graph_diagram.png)
