@@ -1,0 +1,116 @@
+<svg width="100%" viewBox="0 0 680 800" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#378ADD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <style>
+    text { font-family: system-ui, sans-serif; fill: #1a1a1a; }
+    .th { font-size: 14px; font-weight: 500; }
+    .ts { font-size: 12px; }
+    .purple-outer { fill: #EEEDFE; stroke: #7F77DD; }
+    .purple-tab   { fill: #D8D5F8; stroke: #7F77DD; }
+    .teal-box     { fill: #E1F5EE; stroke: #1D9E75; }
+    .blue-box     { fill: #E6F1FB; stroke: #378ADD; }
+    .amber-box    { fill: #FAEEDA; stroke: #BA7517; }
+    .coral-box    { fill: #FAECE7; stroke: #D85A30; }
+    .green-box    { fill: #EAF3DE; stroke: #639922; }
+    .gray-outer   { fill: #F1EFE8; stroke: #888780; }
+    .gray-sub     { fill: #E2DFD7; stroke: #888780; }
+  </style>
+</defs>
+
+<!-- UI -->
+<rect class="purple-outer" x="20" y="20" width="640" height="86" rx="10" stroke-width="0.5"/>
+<text class="th" x="340" y="42" text-anchor="middle">Streamlit UI</text>
+<rect class="purple-tab" x="36"  y="52" width="98"  height="30" rx="5" stroke-width="0.5"/><text class="ts" x="85"  y="71" text-anchor="middle">Chat</text>
+<rect class="purple-tab" x="144" y="52" width="98"  height="30" rx="5" stroke-width="0.5"/><text class="ts" x="193" y="71" text-anchor="middle">Access</text>
+<rect class="purple-tab" x="252" y="52" width="118" height="30" rx="5" stroke-width="0.5"/><text class="ts" x="311" y="71" text-anchor="middle">Learning path</text>
+<rect class="purple-tab" x="380" y="52" width="98"  height="30" rx="5" stroke-width="0.5"/><text class="ts" x="429" y="71" text-anchor="middle">Insights</text>
+<rect class="purple-tab" x="488" y="52" width="154" height="30" rx="5" stroke-width="0.5"/><text class="ts" x="565" y="71" text-anchor="middle">Manager portal</text>
+<line x1="340" y1="106" x2="340" y2="140" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- LangGraph -->
+<rect class="teal-box" x="20" y="142" width="640" height="56" rx="10" stroke-width="0.5"/>
+<text class="th" x="340" y="165" text-anchor="middle">LangGraph state machine</text>
+<text class="ts" x="340" y="184" text-anchor="middle">OnboardingState · conditional routing · HITL flags · nudge count</text>
+<line x1="340" y1="198" x2="340" y2="226" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Orchestrator -->
+<rect class="teal-box" x="190" y="228" width="300" height="48" rx="8" stroke-width="0.5"/>
+<text class="th" x="340" y="250" text-anchor="middle">Orchestrator</text>
+<text class="ts" x="340" y="267" text-anchor="middle">Intent classification · routing</text>
+
+<!-- Orchestrator ↔ agents
+     Bidirectional: Profiler, Learning, Nudge, Progress
+     One-way down: HITL (has its own loop) -->
+<line x1="240" y1="276" x2="82"  y2="320" fill="none" stroke="#666" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+<line x1="282" y1="276" x2="206" y2="320" fill="none" stroke="#666" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+<line x1="340" y1="276" x2="330" y2="320" fill="none" stroke="#666" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+<line x1="398" y1="276" x2="454" y2="320" fill="none" stroke="#666" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+<line x1="440" y1="276" x2="578" y2="320" fill="none" stroke="#666" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+
+<!-- Agents -->
+<rect class="blue-box" x="27"  y="322" width="110" height="52" rx="7" stroke-width="0.5"/><text class="th" x="82"  y="344" text-anchor="middle">Profiler</text><text class="ts" x="82"  y="361" text-anchor="middle">Intake · returning</text>
+<rect class="blue-box" x="151" y="322" width="110" height="52" rx="7" stroke-width="0.5"/><text class="th" x="206" y="344" text-anchor="middle">HITL</text><text class="ts" x="206" y="361" text-anchor="middle">Confirm · snooze</text>
+<rect class="blue-box" x="275" y="322" width="110" height="52" rx="7" stroke-width="0.5"/><text class="th" x="330" y="344" text-anchor="middle">Learning</text><text class="ts" x="330" y="361" text-anchor="middle">RAG · path gen</text>
+<rect class="blue-box" x="399" y="322" width="110" height="52" rx="7" stroke-width="0.5"/><text class="th" x="454" y="344" text-anchor="middle">Nudge</text><text class="ts" x="454" y="361" text-anchor="middle">Proactive tips</text>
+<rect class="blue-box" x="523" y="322" width="110" height="52" rx="7" stroke-width="0.5"/><text class="th" x="578" y="344" text-anchor="middle">Progress</text><text class="ts" x="578" y="361" text-anchor="middle">Summary</text>
+
+<!-- HITL internal loop -->
+<path d="M163 322 Q163 304 206 297 Q249 304 249 322" fill="none" stroke="#378ADD" stroke-width="0.8" stroke-dasharray="4 2" marker-end="url(#ah)"/>
+<text class="ts" x="206" y="294" text-anchor="middle" fill="#378ADD" font-size="10">hitl_pending → response</text>
+
+<!-- Profiler → 3 tools -->
+<line x1="66"  y1="374" x2="99"  y2="426" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="82"  y1="374" x2="253" y2="426" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="98"  y1="374" x2="395" y2="426" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+<!-- Learning → ChromaDB -->
+<line x1="330" y1="374" x2="549" y2="426" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Tools -->
+<rect class="amber-box" x="29"  y="428" width="140" height="52" rx="7" stroke-width="0.5"/><text class="th" x="99"  y="450" text-anchor="middle">Ticketing</text><text class="ts" x="99"  y="467" text-anchor="middle">Jira · ServiceNow</text>
+<rect class="amber-box" x="183" y="428" width="140" height="52" rx="7" stroke-width="0.5"/><text class="th" x="253" y="450" text-anchor="middle">Email</text><text class="ts" x="253" y="467" text-anchor="middle">Gmail · mock DL</text>
+<rect class="amber-box" x="337" y="428" width="140" height="52" rx="7" stroke-width="0.5"/><text class="th" x="407" y="450" text-anchor="middle">Access</text><text class="ts" x="407" y="467" text-anchor="middle">AD groups</text>
+<rect class="coral-box" x="491" y="428" width="140" height="52" rx="7" stroke-width="0.5"/><text class="th" x="561" y="450" text-anchor="middle">ChromaDB</text><text class="ts" x="561" y="467" text-anchor="middle">21 docs · MiniLM</text>
+
+<!-- Tools → LLM -->
+<line x1="99"  y1="480" x2="235" y2="526" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="253" y1="480" x2="295" y2="526" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="407" y1="480" x2="385" y2="526" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="561" y1="480" x2="445" y2="526" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- LLM -->
+<rect class="green-box" x="120" y="528" width="440" height="52" rx="10" stroke-width="0.5"/>
+<text class="th" x="340" y="550" text-anchor="middle">Groq — LLaMA 3.3 70B</text>
+<text class="ts" x="340" y="568" text-anchor="middle">Routing · Q&amp;A answers · path generation · intent</text>
+<line x1="340" y1="580" x2="340" y2="608" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- DB -->
+<rect class="gray-outer" x="20" y="610" width="640" height="78" rx="10" stroke-width="0.5"/>
+<text class="th" x="340" y="632" text-anchor="middle">SQLite — persistent memory</text>
+<rect class="gray-sub" x="36"  y="642" width="108" height="30" rx="5" stroke-width="0.5"/><text class="ts" x="90"  y="661" text-anchor="middle">dev_profiles</text>
+<rect class="gray-sub" x="154" y="642" width="116" height="30" rx="5" stroke-width="0.5"/><text class="ts" x="212" y="661" text-anchor="middle">access_requests</text>
+<rect class="gray-sub" x="280" y="642" width="120" height="30" rx="5" stroke-width="0.5"/><text class="ts" x="340" y="661" text-anchor="middle">progress_tracking</text>
+<rect class="gray-sub" x="410" y="642" width="104" height="30" rx="5" stroke-width="0.5"/><text class="ts" x="462" y="661" text-anchor="middle">learning_path</text>
+<rect class="gray-sub" x="524" y="642" width="120" height="30" rx="5" stroke-width="0.5"/><text class="ts" x="584" y="661" text-anchor="middle">action_log</text>
+<line x1="340" y1="688" x2="340" y2="708" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Observability -->
+<rect class="gray-outer" x="20"  y="710" width="300" height="48" rx="8" stroke-width="0.5"/>
+<text class="th" x="170" y="731" text-anchor="middle">LangSmith</text>
+<text class="ts" x="170" y="749" text-anchor="middle">LLM traces · node transitions</text>
+<rect class="gray-outer" x="330" y="710" width="330" height="48" rx="8" stroke-width="0.5"/>
+<text class="th" x="495" y="731" text-anchor="middle">Structured logging</text>
+<text class="ts" x="495" y="749" text-anchor="middle">[MODULE] key=value → log file</text>
+
+<!-- Legend -->
+<line x1="40"  y1="778" x2="72"  y2="778" fill="none" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+<text class="ts" x="78" y="782" fill="#555">one-way</text>
+<line x1="160" y1="778" x2="192" y2="778" fill="none" stroke="#666" stroke-width="1.5" marker-start="url(#a)" marker-end="url(#a)"/>
+<text class="ts" x="198" y="782" fill="#555">bidirectional (all agent ↔ orchestrator)</text>
+<line x1="492" y1="778" x2="524" y2="778" fill="none" stroke="#378ADD" stroke-width="0.8" stroke-dasharray="4 2" marker-end="url(#ah)"/>
+<text class="ts" x="530" y="782" fill="#378ADD">HITL loop</text>
+</svg>
