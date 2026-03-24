@@ -10,6 +10,9 @@
 ![LangSmith](https://img.shields.io/badge/LangSmith-Observability-yellow?style=flat-square)
 
 ---
+## Live Application Link
+https://new-joiner-in-team-ai-buddy.streamlit.app/
+
 
 ## Application Architecture ![Architecture](docs/architecture.svg)
 
