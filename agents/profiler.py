@@ -299,7 +299,7 @@ def run_provisioning(state: dict) -> dict:
 
     provisioning_results["tickets"] = ticket_result
 
-    # Persist each raised ticket to DB
+    # Persist each ticket to DB — both successful and failed
     for r in ticket_result.get("results", []):
         if r["success"]:
             save_access_request(dev_id, {
@@ -312,6 +312,19 @@ def run_provisioning(state: dict) -> dict:
                 "access_level":      r["access_level"],
                 "requires_approval": r["requires_approval"],
                 "sla_hours":         r["sla_hours"],
+            })
+        else:
+            # Save failed tickets so Access tab can display them with correct count
+            save_access_request(dev_id, {
+                "system_id":         r.get("system_id", "unknown"),
+                "system_name":       r["system_name"],
+                "ticket_type":       r.get("ticket_type", "ACCESS_REQUEST"),
+                "ticket_id":         None,
+                "ticket_summary":    f"Auto-provisioning failed — {r.get('error', 'unknown error')}",
+                "status":            "failed",
+                "access_level":      r.get("access_level", "read"),
+                "requires_approval": r.get("requires_approval", False),
+                "sla_hours":         r.get("sla_hours", 24),
             })
 
     log_agent_action(dev_id, "TICKET_RAISED", ticket_result, session_id=session_id,

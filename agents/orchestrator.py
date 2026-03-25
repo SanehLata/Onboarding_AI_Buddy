@@ -106,7 +106,22 @@ def decide_route(state: dict, user_message: str) -> Route:
         return Route.PROFILE
 
     # ── 3. Provisioning not yet run ───────────────────────────────────────────
+    # Special case: if profile is complete but provisioning hasn't fired yet,
+    # and the user's message contains a different email address, route back to
+    # PROFILE so the corrected email is persisted before provisioning runs.
     if profile_complete and not provisioning_complete:
+        import re
+        email_pattern = r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}'
+        match = re.search(email_pattern, user_message)
+        if match:
+            stored_email = profile.get("email", "")
+            found_email  = match.group(0)
+            if found_email.lower() != stored_email.lower():
+                log.info(
+                    "[DECIDE_ROUTE] email correction detected — stored='%s' new='%s' → PROFILE",
+                    stored_email, found_email
+                )
+                return Route.PROFILE
         log.info("[DECIDE_ROUTE] provisioning_complete=False → PROVISION")
         return Route.PROVISION
 
