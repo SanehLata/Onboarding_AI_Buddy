@@ -41,9 +41,10 @@ from config import log
 
 MANAGER_CREDENTIALS = {
     "james.thornton@techcorp.com":   "manager123",
-    "sarah.kim@techcorp.com":        "manager123",
-    "david.okafor@techcorp.com":     "manager123",
+    "sarah.mitchell@techcorp.com":        "manager123",
+    "marcus.lee@techcorp.com":     "manager123",
     "priya.sharma@techcorp.com":     "manager123",
+    "rachel.kim@techcorp.com":     "manager123",
 }
 
 

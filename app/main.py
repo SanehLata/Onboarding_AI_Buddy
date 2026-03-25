@@ -475,11 +475,11 @@ def render_sidebar() -> None:
                     {profile.get('name', '')}
                 </div>
                 <div style="font-size:0.78rem;color:#8b949e;line-height:1.7;">
-                    <div>📧 <b>Email: </b>{profile.get('email', '—')}</div>
-                    <div>🏢 <b>Team: </b>{profile.get('team_name', '—')}</div>
-                    <div>💼 <b>Role: </b>{profile.get('role_title', '—')}</div>
-                    <div>📊 <b>Experience Level: </b>{profile.get('experience_level', '—').capitalize()}</div>
-                    <div>👤 <b>Manager: </b>{profile.get('manager_name', '—')}</div>
+                    <div>📧 <b>Email: </b>{profile.get('email', 'Not updated yet')}</div>
+                    <div>🏢 <b>Team: </b>{profile.get('team_name', 'Not updated yet')}</div>
+                    <div>💼 <b>Role: </b>{profile.get('role_title', 'Not updated yet')}</div>
+                    <div>📊 <b>Experience Level: </b>{profile.get('experience_level', 'Not updated yet').capitalize()}</div>
+                    <div>👤 <b>Manager: </b>{profile.get('manager_name', 'Not updated yet')}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -731,7 +731,7 @@ def render_access_tab() -> None:
     total    = len(tickets)
     approved = sum(1 for t in tickets if t["status"] in ("approved", "completed"))
     pending  = sum(1 for t in tickets if t["status"] in ("raised", "pending_approval"))
-    failed   = sum(1 for t in tickets if t["status"] == "failed")
+    failed   = sum(1 for t in tickets if t["status"] in ("failed", "rejected"))
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -743,7 +743,7 @@ def render_access_tab() -> None:
                   delta="Awaiting manager" if pending else None,
                   delta_color="off")
     with col4:
-        st.metric("Failed", failed,
+        st.metric("Failed / Rejected", failed,
                   delta="Needs attention" if failed else None,
                   delta_color="inverse" if failed else "off")
 
@@ -872,6 +872,36 @@ def render_access_tab() -> None:
                     <span style="font-size:0.72rem;color:#f85149;margin-left:0.5rem;">
                         Auto-provisioning failed — please contact IT support
                     </span>
+                </div>
+                {badge}
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Rejected tickets ─────────────────────────────────────────────────────
+    rejected_tickets = [t for t in tickets if t["status"] == "rejected"]
+    if rejected_tickets:
+        st.markdown('<div class="section-label">🚫 Rejected by Manager</div>',
+                    unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background:#3d0708;border:1px solid #da3633;border-radius:8px;
+                    padding:0.6rem 1rem;margin-bottom:0.8rem;font-size:0.78rem;color:#f85149;">
+            These requests were rejected by your manager. Please speak with your manager
+            to understand the reason and re-raise if required.
+        </div>
+        """, unsafe_allow_html=True)
+        for t in rejected_tickets:
+            badge  = _badge("rejected")
+            req_id = t.get("ticket_id") or "—"
+            st.markdown(f"""
+            <div class="ticket-row" style="border-color:#da3633;">
+                <div>
+                    <div style="font-weight:600;font-size:0.83rem;color:#e6edf3;">
+                        {t["system_name"]}
+                    </div>
+                    <div style="font-size:0.72rem;color:#8b949e;margin-top:2px;">
+                        {t["ticket_type"]} · {t["access_level"]} · {req_id}
+                    </div>
                 </div>
                 {badge}
             </div>
