@@ -475,11 +475,11 @@ def render_sidebar() -> None:
                     {profile.get('name', '')}
                 </div>
                 <div style="font-size:0.78rem;color:#8b949e;line-height:1.7;">
-                    <div>📧 {profile.get('email', '—')}</div>
-                    <div>🏢 {profile.get('team_name', '—')}</div>
-                    <div>💼 {profile.get('role_title', '—')}</div>
-                    <div>📊 {profile.get('experience_level', '—').capitalize()}</div>
-                    <div>👤 {profile.get('manager_name', '—')}</div>
+                    <div>📧 <b>Email: </b>{profile.get('email', '—')}</div>
+                    <div>🏢 <b>Team: </b>{profile.get('team_name', '—')}</div>
+                    <div>💼 <b>Role: </b>{profile.get('role_title', '—')}</div>
+                    <div>📊 <b>Experience Level: </b>{profile.get('experience_level', '—').capitalize()}</div>
+                    <div>👤 <b>Manager: </b>{profile.get('manager_name', '—')}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)

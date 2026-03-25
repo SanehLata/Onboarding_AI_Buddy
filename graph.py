@@ -192,7 +192,16 @@ def profile_node(state: OnboardingState) -> OnboardingState:
     }}
 
     # If profile is now complete, look up manager details from teams data
-    profile_complete = profile_complete_signal or extracted.get("profile_complete", False)
+    # Hard validation — profile is only truly complete when all five
+    # essential fields are present. Guards against the LLM firing
+    # PROFILE_READY before role and experience have been collected.
+    _required_fields = ("name", "email", "team_name", "role_title", "experience_level")
+    _fields_present  = all(updated_profile.get(f) for f in _required_fields)
+
+    profile_complete = (
+                               profile_complete_signal
+                               or extracted.get("profile_complete", False)
+                       ) and _fields_present
 
     session_id = None  # will be set inside the if block if profile just completed
 
@@ -208,13 +217,19 @@ def profile_node(state: OnboardingState) -> OnboardingState:
                 updated_profile["manager_email"]  = updated_profile.get("manager_email") or team["manager_email"]
 
         updated_profile.setdefault("start_date", date.today().isoformat())
-        updated_profile.setdefault("role_title", "Software Engineer")
-        updated_profile.setdefault("experience_level", "mid")
         updated_profile.setdefault("skills", [])
         updated_profile.setdefault("manager_email", "")
 
+        # DB-safe defaults — applied only at persist time, not stored in state
+        # so they never mask missing fields during the collection loop
+        db_profile = {
+            **updated_profile,
+            "role_title":       updated_profile.get("role_title") or "Software Engineer",
+            "experience_level": updated_profile.get("experience_level") or "mid",
+        }
+
         # Persist to DB
-        dev_id     = save_profile(updated_profile)        # returns int PK
+        dev_id     = save_profile(db_profile)        # returns int PK
         updated_profile["id"] = dev_id
 
         # Start a DB session now that we have a real developer_id

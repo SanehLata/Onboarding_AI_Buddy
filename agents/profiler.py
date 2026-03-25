@@ -74,7 +74,7 @@ Return ONLY valid JSON with these exact keys — nothing else, no markdown:
   "skills":           ["<skill1>", "<skill2>"],
   "manager_name":     "<manager name or null>",
   "start_date":       "<YYYY-MM-DD or null>",
-  "profile_complete": <true if name+email+team_name all present, else false>
+  "profile_complete": <true only if name+email+team_name+role_title+experience_level are ALL present and non-null, else false>
 }}
 
 Available teams: {teams}
@@ -138,8 +138,9 @@ Rules:
 - Ask for missing information naturally — one or two items at a time, never a long list of questions
 - Be warm and welcoming, not robotic
 - If the user provides multiple pieces of info in one message, acknowledge all of them
-- Once you have name, email, and team confirmed, say exactly: "PROFILE_READY" on its own line
-  (this is a signal to the system — do not omit it once you have the three essentials)
+- Once you have name, email, team, role title, AND experience level confirmed, say exactly: "PROFILE_READY" on its own line
+  (this is a signal to the system — do not omit it once you have all five essentials)
+- Do not fire PROFILE_READY until role_title and experience_level are both collected — they are required
 - Do not proceed to answer technical questions until the profile is complete — gently redirect
 
 Current profile status:

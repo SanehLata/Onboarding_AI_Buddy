@@ -21,7 +21,7 @@
       },
       "access_levels": ["viewer", "developer", "admin"],
       "default_access_level": "developer",
-      "requires_approval": false,
+      "requires_approval": true,
       "requires_security_review": false,
       "onboarding_notes": "All new developers get developer-level access by default. Request admin access separately if required."
     },
@@ -46,7 +46,7 @@
       },
       "access_levels": ["viewer", "contributor", "space_admin"],
       "default_access_level": "contributor",
-      "requires_approval": false,
+      "requires_approval": true,
       "requires_security_review": false,
       "onboarding_notes": "Contributors can read and edit all pages. Space admin access requires team lead approval."
     },
