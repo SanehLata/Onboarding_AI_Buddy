@@ -231,20 +231,33 @@ def check_returning_user(user_message: str) -> dict | None:
         log.warning("No profiles found in DB")
         return None
 
-    # Simple name matching — check if any known name appears in the message
+    # Word-boundary name matching — prevents partial matches like
+    # "peter" matching inside "trompeter".
+    # Uses regex \b word boundaries so names only match as whole words.
+    import re
     msg_lower = user_message.lower()
     for profile in profiles:
         name       = profile.get("name", "")
-        first_name = name.split()[0].lower() if name else ""
+        if not name:
+            continue
         full_lower = name.lower()
+        first_name = name.split()[0].lower()
+        last_name  = name.split()[-1].lower() if len(name.split()) > 1 else ""
 
-        # Match on full name or first name appearing in the message
-        if full_lower and full_lower in msg_lower:
-            log.info("Found returning user profile: %s", profile)
+        # Full name match (word-boundary on each part)
+        full_pattern = r'\b' + re.escape(full_lower) + r'\b'
+        if re.search(full_pattern, msg_lower):
+            log.info("Found returning user profile (full name match): %s", profile)
             return profile
-        if first_name and len(first_name) > 2 and first_name in msg_lower:
-            log.info("Found returning user profile: %s", profile)
-            return profile
+
+        # First AND last name both present as whole words — require both to
+        # avoid matching on a common first name alone (e.g. "Nick" matching "Nicholas")
+        if (first_name and len(first_name) > 2 and last_name and len(last_name) > 2):
+            first_pattern = r'\b' + re.escape(first_name) + r'\b'
+            last_pattern  = r'\b' + re.escape(last_name)  + r'\b'
+            if re.search(first_pattern, msg_lower) and re.search(last_pattern, msg_lower):
+                log.info("Found returning user profile (first+last match): %s", profile)
+                return profile
 
     return None
 
