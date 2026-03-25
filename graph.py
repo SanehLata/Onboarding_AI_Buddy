@@ -286,7 +286,26 @@ def provision_node(state: OnboardingState) -> OnboardingState:
         f"name='{state['profile'].get('name')}' "
         f"team='{state['profile'].get('team_name')}'"
     )
-    updated_state = run_provisioning(state)
+    try:
+        updated_state = run_provisioning(state)
+    except Exception as e:
+        log.exception(
+            "[PROVISION_NODE] run_provisioning raised an unhandled exception — "
+            "dev_id=%s error='%s'", dev_id, e
+        )
+        return {
+            **state,
+            "messages": [
+                HumanMessage(content=state["user_message"]),
+                AIMessage(content=(
+                    "I encountered an unexpected error during provisioning. "
+                    "Please try again or contact your administrator."
+                )),
+            ],
+            "response":              "Provisioning error — please try again.",
+            "provisioning_complete": False,
+            "error_count":           state.get("error_count", 0) + 1,
+        }
 
     prov = updated_state.get("provisioning_results", {})
     tickets_result = prov.get("tickets", {})

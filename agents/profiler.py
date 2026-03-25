@@ -327,17 +327,19 @@ def run_provisioning(state: dict) -> dict:
                 "sla_hours":         r["sla_hours"],
             })
         else:
-            # Save failed tickets so Access tab can display them with correct count
+            # Save failed tickets so Access tab can display them with correct count.
+            # Use 'or' not .get() with default — _error_response() sets fields to
+            # None explicitly, so .get(key, default) returns None not the default.
             save_access_request(dev_id, {
-                "system_id":         r.get("system_id", "unknown"),
-                "system_name":       r["system_name"],
-                "ticket_type":       r.get("ticket_type", "ACCESS_REQUEST"),
+                "system_id":         r.get("system_id") or "unknown",
+                "system_name":       r.get("system_name") or "Unknown System",
+                "ticket_type":       r.get("ticket_type") or "ACCESS_REQUEST",
                 "ticket_id":         None,
-                "ticket_summary":    f"Auto-provisioning failed — {r.get('error', 'unknown error')}",
+                "ticket_summary":    f"Auto-provisioning failed — {r.get('error') or 'unknown error'}",
                 "status":            "failed",
-                "access_level":      r.get("access_level", "read"),
-                "requires_approval": r.get("requires_approval", False),
-                "sla_hours":         r.get("sla_hours", 24),
+                "access_level":      r.get("access_level") or "read",
+                "requires_approval": r.get("requires_approval") or False,
+                "sla_hours":         r.get("sla_hours") or 24,
             })
 
     log_agent_action(dev_id, "TICKET_RAISED", ticket_result, session_id=session_id,
