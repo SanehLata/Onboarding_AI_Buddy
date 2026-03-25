@@ -45,8 +45,12 @@ def save_profile(profile: dict) -> int:
 
     with _connect() as conn:
         existing = conn.execute(
-            "SELECT id FROM developer_profiles WHERE email = ?",
-            (profile["email"],),
+            """
+            SELECT id FROM developer_profiles
+            WHERE email = ?
+              AND LOWER(TRIM(name)) = LOWER(TRIM(?))
+            """,
+            (profile["email"], profile["name"]),
         ).fetchone()
 
         if existing:
@@ -67,11 +71,11 @@ def save_profile(profile: dict) -> int:
                 """,
                 {
                     "id":               dev_id,
-                    "name":             profile["name"],
-                    "team_id":          profile["team_id"],
-                    "team_name":        profile["team_name"],
-                    "manager_name":     profile["manager_name"],
-                    "manager_email":    profile["manager_email"],
+                    "name":             profile.get("name", ""),
+                    "team_id":          profile.get("team_id", ""),
+                    "team_name":        profile.get("team_name", ""),
+                    "manager_name":     profile.get("manager_name", ""),
+                    "manager_email":    profile.get("manager_email", ""),
                     "role_title":       profile.get("role_title", "Software Engineer"),
                     "experience_level": profile.get("experience_level", "mid"),
                     "skills":           skills,
@@ -93,12 +97,12 @@ def save_profile(profile: dict) -> int:
                      :start_date, 'in_progress', 1, :created_at, :updated_at)
                 """,
                 {
-                    "name":             profile["name"],
-                    "email":            profile["email"],
-                    "team_id":          profile["team_id"],
-                    "team_name":        profile["team_name"],
-                    "manager_name":     profile["manager_name"],
-                    "manager_email":    profile["manager_email"],
+                    "name":             profile.get("name", ""),
+                    "email":            profile.get("email", ""),
+                    "team_id":          profile.get("team_id", ""),
+                    "team_name":        profile.get("team_name", ""),
+                    "manager_name":     profile.get("manager_name", ""),
+                    "manager_email":    profile.get("manager_email", ""),
                     "role_title":       profile.get("role_title", "Software Engineer"),
                     "experience_level": profile.get("experience_level", "mid"),
                     "skills":           skills,
