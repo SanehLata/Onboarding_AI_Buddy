@@ -67,7 +67,7 @@ Return ONLY valid JSON with these exact keys — nothing else, no markdown:
 
 {{
   "name":             "<full name or null>",
-  "email":            "<corporate email or null>",
+  "email":            "<email exactly as typed by the user, or null>",
   "team_name":        "<team name or null>",
   "role_title":       "<job title or null>",
   "experience_level": "<junior|mid|senior|lead or null>",
@@ -76,6 +76,12 @@ Return ONLY valid JSON with these exact keys — nothing else, no markdown:
   "start_date":       "<YYYY-MM-DD or null>",
   "profile_complete": <true only if name+email+team_name+role_title+experience_level are ALL present and non-null, else false>
 }}
+
+CRITICAL RULES:
+- For "email": copy the email address EXACTLY as the user typed it. Do NOT infer, correct,
+  or construct an email from the user's name. If the user gave a Gmail address, use that Gmail
+  address. Never substitute a corporate-format email unless the user explicitly provided one.
+- If no email has been mentioned in the conversation, use null.
 
 Available teams: {teams}
 
